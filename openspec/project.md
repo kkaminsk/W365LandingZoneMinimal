@@ -6,7 +6,7 @@ W365LandingZone provides Infrastructure-as-Code (IaC) for deploying Azure hub-an
 
 - **Hub Network** (`1_Hub/`) - Centralized connectivity, shared services, governance, and security controls
 - **Windows 365 Spoke Network** (`2_Spoke/`) - Dedicated network infrastructure optimized for Cloud PC workloads
-- **Multi-tenant Support** - Automatic, non-overlapping IP address allocation for up to 40 students/environments
+- **Multi-tenant Support** - Automatic, non-overlapping IP address allocation for up to 40 spokes/environments
 
 ### Goals
 1. Provide production-ready Azure Landing Zone infrastructure for Windows 365
@@ -116,7 +116,7 @@ infra/
 - Always run `-Validate` before any deployment
 - Use `-WhatIf` to review changes before production deployment
 - Verify resource creation with `verify.ps1` after hub deployment
-- Test with a single student number before bulk deployment
+- Test with a single spoke number before bulk deployment
 
 ### Git Workflow
 
@@ -146,10 +146,10 @@ Enterprise-scale architecture pattern providing:
 - Identity and access management
 - Management and monitoring
 
-### Multi-Student Environment
+### Multi-Spoke Environment
 Designed for training/lab scenarios:
 - Each student gets isolated /24 network
-- Student number (1-40) determines IP range
+- Spoke number (1-40) determines IP range
 - Automatic subnet calculation prevents conflicts
 - Optional VNet peering to shared hub
 
@@ -157,7 +157,7 @@ Designed for training/lab scenarios:
 
 ### Technical Constraints
 - Maximum 40 student environments (IP range limitation)
-- Student numbers must be 1-40 (validated in deployment scripts)
+- Spoke numbers must be 1-40 (validated in deployment scripts)
 - Hub must be deployed before spoke peering can be established
 - Windows 365 service principal must exist for permissions assignment
 
@@ -213,7 +213,7 @@ Designed for training/lab scenarios:
 - [x] Resource group creation
 - [x] Spoke virtual network with subnets
 - [x] Network Security Groups (W365-optimized)
-- [x] Student number-based IP allocation
+- [x] Spoke number-based IP allocation
 - [x] Windows 365 permission setup
 - [x] Custom RBAC role definition
 - [x] Permission verification script

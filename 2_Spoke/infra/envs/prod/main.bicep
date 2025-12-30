@@ -6,10 +6,10 @@ param location string = 'southcentralus'
 @description('Environment name (prod, dev, test)')
 param env string = 'prod'
 
-@description('Student number (1-40) for unique IP addressing')
+@description('Spoke number (1-40) for unique subnet addressing within consolidated VNet')
 @minValue(1)
 @maxValue(40)
-param studentNumber int = 1
+param spokeNumber int = 1
 
 @description('Common tags applied to all resources')
 param tags object = {
@@ -19,10 +19,10 @@ param tags object = {
   costCenter: '1000'
 }
 
-// Calculate IP addresses based on student number to avoid conflicts
-// Student 1 = 192.168.1.0/24, Student 2 = 192.168.2.0/24, etc.
-var thirdOctet = studentNumber
-var vnetAddressSpace = '192.168.${thirdOctet}.0/24'
+// Consolidated VNet uses 192.168.0.0/16 address space
+// Each spoke gets subnets within: 192.168.{spokeNumber}.0/24
+var consolidatedVnetAddressSpace = '192.168.0.0/16'
+var thirdOctet = spokeNumber
 var cloudPCSubnetPrefix = '192.168.${thirdOctet}.0/26'
 var mgmtSubnetPrefix = '192.168.${thirdOctet}.64/26'
 var avdSubnetPrefix = '192.168.${thirdOctet}.128/26'
@@ -42,12 +42,13 @@ param useRemoteGateways bool = false
 @description('Windows 365 Service Principal Object ID (required for permissions)')
 param windows365ServicePrincipalId string
 
-var rgName = 'rg-w365-spoke-student${studentNumber}-${env}'
-var vnetName = 'vnet-w365-spoke-student${studentNumber}-${env}'
+// Single consolidated resource group and VNet for all spokes
+var rgName = 'rg-w365-spokes-${env}'
+var vnetName = 'vnet-w365-spokes-${env}'
 
-// Resource Group
+// Resource Group (will be created once, reused for subsequent spokes)
 module rg '../../modules/rg/main.bicep' = {
-  name: 'rg-w365-spoke-student${studentNumber}'
+  name: 'rg-w365-spokes-${env}'
   scope: subscription()
   params: {
     location: location
@@ -56,15 +57,16 @@ module rg '../../modules/rg/main.bicep' = {
   }
 }
 
-// Spoke Network
+// Consolidated Spoke Network - adds subnets for this spoke
 module spokeNetwork '../../modules/spoke-network/main.bicep' = {
-  name: 'spoke-network-w365-student${studentNumber}'
+  name: 'spoke-network-spoke${spokeNumber}'
   scope: resourceGroup(rgName)
   dependsOn: [ rg ]
   params: {
     location: location
     vnetName: vnetName
-    vnetAddressSpace: vnetAddressSpace
+    vnetAddressSpace: consolidatedVnetAddressSpace
+    spokeNumber: spokeNumber
     cloudPCSubnetPrefix: cloudPCSubnetPrefix
     mgmtSubnetPrefix: mgmtSubnetPrefix
     avdSubnetPrefix: avdSubnetPrefix
@@ -78,7 +80,7 @@ module spokeNetwork '../../modules/spoke-network/main.bicep' = {
 
 // Windows 365 Permissions
 module w365Permissions '../../modules/w365-permissions/main.bicep' = {
-  name: 'w365-permissions-student${studentNumber}'
+  name: 'w365-permissions-spoke${spokeNumber}'
   scope: resourceGroup(rgName)
   dependsOn: [ spokeNetwork ]
   params: {
@@ -98,13 +100,13 @@ output vnetId string = spokeNetwork.outputs.vnetId
 @description('Virtual Network name')
 output vnetName string = spokeNetwork.outputs.vnetName
 
-@description('Cloud PC subnet ID')
+@description('Cloud PC subnet ID for spoke')
 output cloudPCSubnetId string = spokeNetwork.outputs.cloudPCSubnetId
 
-@description('Management subnet ID')
+@description('Management subnet ID for spoke')
 output mgmtSubnetId string = spokeNetwork.outputs.mgmtSubnetId
 
-@description('AVD subnet ID')
+@description('AVD subnet ID for spoke')
 output avdSubnetId string = spokeNetwork.outputs.avdSubnetId
 
 @description('Peering status to hub')

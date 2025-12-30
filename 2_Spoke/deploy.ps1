@@ -22,29 +22,36 @@
 .PARAMETER SubscriptionId
     Optional subscription ID within the selected tenant. When omitted the script will prompt if multiple subscriptions exist.
 
-.PARAMETER StudentNumber
-    Student number (1-40) for unique IP addressing. Each student gets a unique /24 network: 192.168.X.0/24 where X = StudentNumber.
+.PARAMETER SpokeNumber
+    Spoke number (1-40) for unique IP addressing. Each spoke gets a unique /24 network: 192.168.X.0/24 where X = SpokeNumber.
     Default: 1
 
 .PARAMETER Force
     Forces clearing of all cached Azure credentials before authentication.
     Use this if you're being redirected to the wrong tenant or need to log in with different credentials.
 
-.EXAMPLE
-    .\deploy.ps1
-    Deploy the infrastructure for student 1
+.PARAMETER DisablePeering
+    Explicitly disable VNet peering to hub even if a hub VNet is discovered.
+    By default, the script auto-discovers hub VNets (matching 'vnet-hub*') and enables peering.
+
+.PARAMETER HubVnetId
+    Manually specify the hub VNet resource ID for peering. Overrides auto-discovery.
 
 .EXAMPLE
-    .\deploy.ps1 -StudentNumber 5
-    Deploy the infrastructure for student 5 (uses 192.168.5.0/24)
+    .\deploy.ps1
+    Deploy the infrastructure for spoke 1
+
+.EXAMPLE
+    .\deploy.ps1 -SpokeNumber 5
+    Deploy the infrastructure for spoke 5 (uses 192.168.5.0/24)
 
 .EXAMPLE
     .\deploy.ps1 -Force
     Clear cached credentials and deploy with fresh authentication
 
 .EXAMPLE
-    .\deploy.ps1 -Force -StudentNumber 3
-    Clear credentials and deploy for student 3
+    .\deploy.ps1 -Force -SpokeNumber 3
+    Clear credentials and deploy for spoke 3
 
 .EXAMPLE
     .\deploy.ps1 -Validate
@@ -55,8 +62,8 @@
     Preview changes before deployment
 
 .EXAMPLE
-    .\deploy.ps1 -TenantId "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" -SubscriptionId "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy" -StudentNumber 10
-    Deploy using explicit tenant and subscription without interactive prompts for student 10
+    .\deploy.ps1 -TenantId "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" -SubscriptionId "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy" -SpokeNumber 10
+    Deploy using explicit tenant and subscription without interactive prompts for spoke 10
 
 .NOTES
     Requires:
@@ -85,10 +92,16 @@ param(
 
     [Parameter(Mandatory = $false)]
     [ValidateRange(1, 40)]
-    [int]$StudentNumber = 1,
+    [int]$SpokeNumber = 1,
 
     [Parameter(Mandatory = $false)]
-    [switch]$Force
+    [switch]$Force,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$DisablePeering,
+
+    [Parameter(Mandatory = $false)]
+    [string]$HubVnetId = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -105,26 +118,26 @@ Write-Host "`n==========================================" -ForegroundColor Cyan
 Write-Host "Windows 365 Spoke Network Deployment" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 
-# Prompt for student number if not provided
-if (-not $PSBoundParameters.ContainsKey('StudentNumber')) {
+# Prompt for spoke number if not provided
+if (-not $PSBoundParameters.ContainsKey('SpokeNumber')) {
     Write-Host "`n" -NoNewline
     do {
-        $studentInput = Read-Host "Enter Student Number (1-40)"
-        $studentNumberInt = 0
-        $isValid = [int]::TryParse($studentInput, [ref]$studentNumberInt) -and $studentNumberInt -ge 1 -and $studentNumberInt -le 40
-        
+        $spokeInput = Read-Host "Enter Spoke Number (1-40)"
+        $spokeNumberInt = 0
+        $isValid = [int]::TryParse($spokeInput, [ref]$spokeNumberInt) -and $spokeNumberInt -ge 1 -and $spokeNumberInt -le 40
+
         if (-not $isValid) {
             Write-Host "Invalid input. Please enter a number between 1 and 40." -ForegroundColor Yellow
         }
     } while (-not $isValid)
-    
-    $StudentNumber = $studentNumberInt
-    Write-Host "Selected Student Number: $StudentNumber" -ForegroundColor Green
-    Write-Host "VNet Address Space: 192.168.$StudentNumber.0/24" -ForegroundColor Cyan
+
+    $SpokeNumber = $spokeNumberInt
+    Write-Host "Selected Spoke Number: $SpokeNumber" -ForegroundColor Green
+    Write-Host "VNet Address Space: 192.168.$SpokeNumber.0/24" -ForegroundColor Cyan
 }
 else {
-    Write-Host "`nStudent Number: $StudentNumber (from parameter)" -ForegroundColor Green
-    Write-Host "VNet Address Space: 192.168.$StudentNumber.0/24" -ForegroundColor Cyan
+    Write-Host "`nSpoke Number: $SpokeNumber (from parameter)" -ForegroundColor Green
+    Write-Host "VNet Address Space: 192.168.$SpokeNumber.0/24" -ForegroundColor Cyan
 }
 
 # Function to test if Az module is installed
@@ -288,6 +301,56 @@ function Select-AzureTenantContext {
     }
 }
 
+# Function to discover hub VNet for auto-peering
+function Find-HubVNet {
+    Write-Host "`nDiscovering hub VNet for peering..." -ForegroundColor Yellow
+
+    if ($DisablePeering) {
+        Write-Host "  Peering disabled via -DisablePeering flag" -ForegroundColor Gray
+        return $null
+    }
+
+    if (-not [string]::IsNullOrEmpty($HubVnetId)) {
+        Write-Host "  Using manually specified hub VNet ID" -ForegroundColor Green
+        Write-Host "  Hub VNet: $HubVnetId" -ForegroundColor Gray
+        return $HubVnetId
+    }
+
+    try {
+        # Search for VNets matching hub naming pattern
+        Write-Host "  Searching for VNets matching 'vnet-hub*'..." -ForegroundColor Gray
+        $hubVnets = Get-AzVirtualNetwork | Where-Object { $_.Name -like 'vnet-hub*' }
+
+        if ($hubVnets -and $hubVnets.Count -gt 0) {
+            if ($hubVnets.Count -eq 1) {
+                $discoveredHub = $hubVnets[0]
+                Write-Host "  ✓ Hub VNet discovered: $($discoveredHub.Name)" -ForegroundColor Green
+                Write-Host "    Resource Group: $($discoveredHub.ResourceGroupName)" -ForegroundColor Gray
+                Write-Host "    Address Space: $($discoveredHub.AddressSpace.AddressPrefixes -join ', ')" -ForegroundColor Gray
+                return $discoveredHub.Id
+            }
+            else {
+                Write-Host "  Multiple hub VNets found:" -ForegroundColor Yellow
+                for ($i = 0; $i -lt $hubVnets.Count; $i++) {
+                    Write-Host "    [$($i+1)] $($hubVnets[$i].Name) ($($hubVnets[$i].ResourceGroupName))" -ForegroundColor Gray
+                }
+                Write-Host "  Using first match: $($hubVnets[0].Name)" -ForegroundColor Cyan
+                return $hubVnets[0].Id
+            }
+        }
+        else {
+            Write-Host "  No hub VNet found (no VNets matching 'vnet-hub*')" -ForegroundColor Yellow
+            Write-Host "  Deployment will proceed without hub peering" -ForegroundColor Gray
+            return $null
+        }
+    }
+    catch {
+        Write-Host "  Warning: Failed to discover hub VNet: $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "  Deployment will proceed without hub peering" -ForegroundColor Gray
+        return $null
+    }
+}
+
 # Function to check if files exist
 function Test-DeploymentFiles {
     Write-Host "`n[3/6] Validating deployment files..." -ForegroundColor Yellow
@@ -348,8 +411,8 @@ function Build-BicepTemplate {
 # Function to validate deployment
 function Test-Deployment {
     Write-Host "`n[5/6] Validating deployment template..." -ForegroundColor Yellow
-    Write-Host "  Student Number: $StudentNumber" -ForegroundColor Gray
-    Write-Host "  VNet Address Space: 192.168.$StudentNumber.0/24" -ForegroundColor Gray
+    Write-Host "  Spoke Number: $SpokeNumber" -ForegroundColor Gray
+    Write-Host "  VNet Address Space: 192.168.$SpokeNumber.0/24" -ForegroundColor Gray
     
     try {
         # Get Windows 365 service principal ID for validation
@@ -370,7 +433,7 @@ function Test-Deployment {
         }
         
         # Override/add required parameters
-        $templateParams['studentNumber'] = $StudentNumber
+        $templateParams['spokeNumber'] = $SpokeNumber
         $templateParams['windows365ServicePrincipalId'] = $w365SpId
         
         $null = Test-AzSubscriptionDeployment `
@@ -474,19 +537,17 @@ function Start-Deployment {
     Write-Host "  Deployment Name: $DeploymentName" -ForegroundColor Gray
     Write-Host "  Location: $Location" -ForegroundColor Gray
     Write-Host "  Scope: Subscription" -ForegroundColor Gray
-    Write-Host "  Student Number: $StudentNumber" -ForegroundColor Cyan
-    Write-Host "  VNet Address: 192.168.$StudentNumber.0/24" -ForegroundColor Cyan
-    Write-Host "    - Cloud PC Subnet: 192.168.$StudentNumber.0/26" -ForegroundColor Gray
-    Write-Host "    - Management Subnet: 192.168.$StudentNumber.64/26" -ForegroundColor Gray
-    Write-Host "    - AVD Subnet: 192.168.$StudentNumber.128/26" -ForegroundColor Gray
-    
+    Write-Host "  Spoke Number: $SpokeNumber" -ForegroundColor Cyan
+    Write-Host "  Consolidated VNet: vnet-w365-spokes-prod (192.168.0.0/16)" -ForegroundColor Cyan
+    Write-Host "  Spoke Subnets:" -ForegroundColor Cyan
+    Write-Host "    - snet-spoke$SpokeNumber-cloudpc: 192.168.$SpokeNumber.0/26" -ForegroundColor Gray
+    Write-Host "    - snet-spoke$SpokeNumber-mgmt: 192.168.$SpokeNumber.64/26" -ForegroundColor Gray
+    Write-Host "    - snet-spoke$SpokeNumber-avd: 192.168.$SpokeNumber.128/26" -ForegroundColor Gray
+
     try {
-        # Check VNet quota for student spoke resource group
-        $expectedRgName = "rg-w365-spoke-student$StudentNumber-prod"
-        Write-Host "`nEnforcing resource quota for student lab environment..." -ForegroundColor Yellow
-        if (-not (Test-VNetQuota -ResourceGroupName $expectedRgName)) {
-            throw "VNet quota exceeded. Cannot proceed with deployment."
-        }
+        # Consolidated architecture uses single resource group for all spokes
+        $expectedRgName = "rg-w365-spokes-prod"
+        Write-Host "`nDeploying to consolidated spoke infrastructure..." -ForegroundColor Yellow
         
         # Get Windows 365 service principal ID
         $w365SpId = Get-Windows365ServicePrincipal
@@ -506,14 +567,27 @@ function Start-Deployment {
         }
         
         # Override/add required parameters
-        $templateParams['studentNumber'] = $StudentNumber
+        $templateParams['spokeNumber'] = $SpokeNumber
         $templateParams['windows365ServicePrincipalId'] = $w365SpId
-        
+
+        # Discover hub VNet for auto-peering (unless disabled)
+        $discoveredHubId = Find-HubVNet
+        if ($discoveredHubId) {
+            $templateParams['hubVnetId'] = $discoveredHubId
+        }
+
         # Display parameters being passed to deployment
         Write-Host "`n  Deployment Parameters:" -ForegroundColor Yellow
-        Write-Host "    Student Number: $($templateParams['studentNumber'])" -ForegroundColor Gray
-        Write-Host "    Expected Resource Group: rg-w365-spoke-student$($templateParams['studentNumber'])-$($templateParams['env'])" -ForegroundColor Gray
-        Write-Host "    Expected VNet: vnet-w365-spoke-student$($templateParams['studentNumber'])-$($templateParams['env'])" -ForegroundColor Gray
+        Write-Host "    Spoke Number: $($templateParams['spokeNumber'])" -ForegroundColor Gray
+        Write-Host "    Resource Group: rg-w365-spokes-$($templateParams['env'])" -ForegroundColor Gray
+        Write-Host "    Consolidated VNet: vnet-w365-spokes-$($templateParams['env'])" -ForegroundColor Gray
+        Write-Host "    Subnets: snet-spoke$($templateParams['spokeNumber'])-cloudpc, snet-spoke$($templateParams['spokeNumber'])-mgmt" -ForegroundColor Gray
+        if ($templateParams['hubVnetId']) {
+            Write-Host "    Hub Peering: ENABLED (auto-discovered)" -ForegroundColor Green
+        }
+        else {
+            Write-Host "    Hub Peering: DISABLED (no hub found or -DisablePeering specified)" -ForegroundColor Yellow
+        }
         
         if ($WhatIf) {
             Write-Host "`n=== WHAT-IF MODE - No changes will be made ===" -ForegroundColor Magenta

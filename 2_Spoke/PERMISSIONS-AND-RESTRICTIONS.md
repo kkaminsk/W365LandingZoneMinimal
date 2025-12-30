@@ -13,9 +13,9 @@ Deploy the custom role definition for least-privilege access:
 ```powershell
 # Create custom role scoped to specific resource group
 $subscriptionId = "your-subscription-id"
-$studentNumber = 1  # Student number (1-40)
+$spokeNumber = 1  # Spoke number (1-40)
 $env = "prod"       # Environment (prod, dev, test)
-$rgName = "rg-w365-spoke-student$studentNumber-$env"
+$rgName = "rg-w365-spoke-spoke$spokeNumber-$env"
 
 $roleDefinition = Get-Content "W365-MinimumRole.json" | ConvertFrom-Json
 $roleDefinition.AssignableScopes[0] = "/subscriptions/$subscriptionId/resourceGroups/$rgName"
@@ -46,9 +46,9 @@ New-AzRoleAssignment `
 If custom roles aren't feasible, use built-in **Network Contributor** role scoped to resource group:
 
 ```powershell
-$studentNumber = 1  # Student number (1-40)
+$spokeNumber = 1  # Spoke number (1-40)
 $env = "prod"       # Environment (prod, dev, test)
-$rgName = "rg-w365-spoke-student$studentNumber-$env"
+$rgName = "rg-w365-spoke-spoke$spokeNumber-$env"
 $adminUser = "admin@contoso.com"
 
 # Network Contributor - for network resource creation/management
@@ -99,10 +99,10 @@ After deploying the network infrastructure, the Windows 365 service requires spe
 .\Set-W365Permissions.ps1
 
 # Or manually assign these roles:
-$studentNumber = 1  # Student number (1-40)
+$spokeNumber = 1  # Spoke number (1-40)
 $env = "prod"       # Environment (prod, dev, test)
-$rgName = "rg-w365-spoke-student$studentNumber-$env"
-$vnetName = "vnet-w365-spoke-student$studentNumber-$env"
+$rgName = "rg-w365-spoke-spoke$spokeNumber-$env"
+$vnetName = "vnet-w365-spoke-spoke$spokeNumber-$env"
 
 $w365ServicePrincipal = Get-AzADServicePrincipal -ApplicationId '0af06dc6-e4b5-4f28-818e-e78e62d137a5'
 
@@ -138,7 +138,7 @@ New-AzRoleAssignment `
 
 ### 1. Azure Policy - Restrict VNet Address Spaces
 
-Prevent unauthorized IP ranges. Each student (1-40) gets a unique `/24` network: `192.168.{StudentNumber}.0/24`
+Prevent unauthorized IP ranges. Each spoke (1-40) gets a unique `/24` network: `192.168.{SpokeNumber}.0/24`
 
 **Policy: Allowed VNet Address Spaces**
 
@@ -174,9 +174,9 @@ Limit deployments to specific Azure regions:
 
 ```powershell
 $allowedLocations = @('southcentralus', 'eastus', 'westus3')
-$studentNumber = 1  # Student number (1-40)
+$spokeNumber = 1  # Spoke number (1-40)
 $env = "prod"
-$rgName = "rg-w365-spoke-student$studentNumber-$env"
+$rgName = "rg-w365-spoke-spoke$spokeNumber-$env"
 
 $policyDef = Get-AzPolicyDefinition | Where-Object { $_.Properties.DisplayName -eq 'Allowed locations' }
 
@@ -229,9 +229,9 @@ Enforce tagging for cost tracking and governance:
 Apply with:
 
 ```powershell
-$studentNumber = 1  # Student number (1-40)
+$spokeNumber = 1  # Spoke number (1-40)
 $env = "prod"
-$rgName = "rg-w365-spoke-student$studentNumber-$env"
+$rgName = "rg-w365-spoke-spoke$spokeNumber-$env"
 
 New-AzPolicyAssignment `
     -Name 'require-w365-tags' `
@@ -248,14 +248,14 @@ Create budget to prevent cost overruns:
 
 ```powershell
 # Create budget for the resource group
-$studentNumber = 1  # Student number (1-40)
+$spokeNumber = 1  # Spoke number (1-40)
 $env = "prod"
-$rgName = "rg-w365-spoke-student$studentNumber-$env"
+$rgName = "rg-w365-spoke-spoke$spokeNumber-$env"
 $budgetScope = "/subscriptions/$subscriptionId/resourceGroups/$rgName"
 
 # Use Azure CLI (Az PowerShell doesn't support budget creation)
 az consumption budget create `
-    --budget-name "w365-student$studentNumber-monthly-budget" `
+    --budget-name "w365-spoke$spokeNumber-monthly-budget" `
     --amount 50 `
     --time-grain Monthly `
     --start-date (Get-Date).ToString("yyyy-MM-01") `
@@ -275,10 +275,10 @@ az consumption budget create `
 Protect persistent resources from accidental deletion:
 
 ```powershell
-$studentNumber = 1  # Student number (1-40)
+$spokeNumber = 1  # Spoke number (1-40)
 $env = "prod"
-$rgName = "rg-w365-spoke-student$studentNumber-$env"
-$vnetName = "vnet-w365-spoke-student$studentNumber-$env"
+$rgName = "rg-w365-spoke-spoke$spokeNumber-$env"
+$vnetName = "vnet-w365-spoke-spoke$spokeNumber-$env"
 
 # Lock the resource group (delete protection)
 New-AzResourceLock `
@@ -354,15 +354,15 @@ This prevents "Allow from Any" inbound rules.
 Control which Azure services the VNet can access:
 
 ```powershell
-$studentNumber = 1  # Student number (1-40)
+$spokeNumber = 1  # Spoke number (1-40)
 $env = "prod"
-$rgName = "rg-w365-spoke-student$studentNumber-$env"
+$rgName = "rg-w365-spoke-spoke$spokeNumber-$env"
 $location = "southcentralus"
 
 # Create service endpoint policy
 $serviceEndpointPolicy = New-AzServiceEndpointPolicy `
     -ResourceGroupName $rgName `
-    -Name "sep-w365-storage-student$studentNumber" `
+    -Name "sep-w365-storage-spoke$spokeNumber" `
     -Location $location
 
 # Add Storage account to allowed list
@@ -402,19 +402,19 @@ Add-AzServiceEndpointPolicyDefinition `
 - **VNet Peering:** ~$10-20/month (depending on traffic)
 - **Service Endpoints:** $0 (no charge)
 
-### Persistent Resources (per student)
+### Persistent Resources (per spoke)
 - **Virtual Network:** 1 VNet with 2-3 subnets (Class C /24)
 - **NSGs:** 2-3 NSGs (CloudPC, Management, AVD if enabled)
 - **Peering:** Optional to hub network
 - **Service Endpoints:** Storage and KeyVault enabled on CloudPC subnet
 
 ### Recommended Limits
-- **Max students:** 40 (IP range 192.168.1.0/24 - 192.168.40.0/24)
-- **Max VNets per student RG:** 1
+- **Max spokes:** 40 (IP range 192.168.1.0/24 - 192.168.40.0/24)
+- **Max VNets per spoke RG:** 1
 - **Max subnets per VNet:** 2-3 (AVD subnet is optional)
 - **Max NSG rules per NSG:** 50 (review and consolidate regularly)
 - **Max peerings per VNet:** 2-3
-- **Monthly budget per student:** $50-100 (mostly peering costs)
+- **Monthly budget per spoke:** $50-100 (mostly peering costs)
 
 ---
 
@@ -422,9 +422,9 @@ Add-AzServiceEndpointPolicyDefinition `
 
 ### Enforce IP Address Standards
 
-Each student (1-40) receives a unique `/24` network automatically calculated from their student number:
-- **Formula:** `192.168.{StudentNumber}.0/24`
-- **Example:** Student 5 = `192.168.5.0/24`
+Each spoke (1-40) receives a unique `/24` network automatically calculated from their spoke number:
+- **Formula:** `192.168.{SpokeNumber}.0/24`
+- **Example:** Spoke 5 = `192.168.5.0/24`
 
 ```powershell
 # Policy to enforce specific address space (restrict to 192.168.1-40.0/24)
@@ -452,10 +452,10 @@ $ipRangePolicy = @{
 ```
 
 **Approved IP Ranges:**
-- **W365 Spoke:** `192.168.{StudentNumber}.0/24` (StudentNumber: 1-40)
+- **W365 Spoke:** `192.168.{SpokeNumber}.0/24` (SpokeNumber: 1-40)
 - **Hub Network:** `10.10.0.0/20` (shared, deployed separately)
 
-**Subnet Allocation (per student):**
+**Subnet Allocation (per spoke):**
 | Subnet | CIDR | IP Range | Usable IPs | Purpose |
 |--------|------|----------|------------|---------|
 | CloudPC (snet-cloudpc) | /26 | .0 - .63 | 62 | Windows 365 Cloud PCs |
@@ -463,7 +463,7 @@ $ipRangePolicy = @{
 | AVD (snet-avd) | /26 | .128 - .191 | 62 | Azure Virtual Desktop (optional, disabled by default) |
 | Reserved | - | .192 - .255 | 64 | Future expansion |
 
-**Example for Student 5:**
+**Example for Spoke 5:**
 | Subnet | Address Prefix |
 |--------|----------------|
 | CloudPC | 192.168.5.0/26 |
@@ -476,10 +476,10 @@ $ipRangePolicy = @{
 
 ### 1. Pre-deployment (Subscription Admin)
 - [ ] Pre-register Microsoft.Network resource provider
-- [ ] Determine student number assignment (1-40)
+- [ ] Determine spoke number assignment (1-40)
 - [ ] Apply Azure Policies (IP ranges, regions, tags)
 - [ ] Create budget with alerts
-- [ ] Document IP address allocations per student
+- [ ] Document IP address allocations per spoke
 
 ### 2. Grant Permissions (IAM Admin)
 - [ ] Create custom role or use Network Contributor
@@ -494,8 +494,8 @@ $ipRangePolicy = @{
 - [ ] Enable Activity Log alerts for high-risk operations
 
 ### 4. Deploy Infrastructure
-- [ ] Admin runs `.\deploy.ps1 -Validate -StudentNumber {N}`
-- [ ] Admin runs `.\deploy.ps1 -StudentNumber {N}`
+- [ ] Admin runs `.\deploy.ps1 -Validate -SpokeNumber {N}`
+- [ ] Admin runs `.\deploy.ps1 -SpokeNumber {N}`
 - [ ] Verify deployment success
 - [ ] Run `.\Set-W365Permissions.ps1` for Windows 365 service (interactive)
 - [ ] Run `.\Check-W365Permissions.ps1` to validate (interactive)
@@ -504,7 +504,7 @@ $ipRangePolicy = @{
 - [ ] Apply resource lock to VNet (`ReadOnly` or `CanNotDelete`)
 - [ ] Document deployed resources
 - [ ] Configure monitoring and alerts
-- [ ] Update network documentation with student IP allocations
+- [ ] Update network documentation with spoke IP allocations
 
 ---
 
@@ -550,14 +550,14 @@ Microsoft.Network/virtualNetworks/virtualNetworkPeerings/write
 **On Hub Side:**
 ```powershell
 # Hub admin needs to create reverse peering
-$studentNumber = 1  # Student number (1-40)
+$spokeNumber = 1  # Spoke number (1-40)
 $env = "prod"
-$spokeVnetName = "vnet-w365-spoke-student$studentNumber-$env"
+$spokeVnetName = "vnet-w365-spoke-spoke$spokeNumber-$env"
 
 New-AzVirtualNetworkPeering `
-    -Name "peer-to-w365-spoke-student$studentNumber" `
+    -Name "peer-to-w365-spoke-spoke$spokeNumber" `
     -VirtualNetwork (Get-AzVirtualNetwork -Name "vnet-hub") `
-    -RemoteVirtualNetworkId "/subscriptions/.../resourceGroups/rg-w365-spoke-student$studentNumber-$env/providers/Microsoft.Network/virtualNetworks/$spokeVnetName"
+    -RemoteVirtualNetworkId "/subscriptions/.../resourceGroups/rg-w365-spoke-spoke$spokeNumber-$env/providers/Microsoft.Network/virtualNetworks/$spokeVnetName"
 ```
 
 ### Peering Configuration Restrictions
@@ -594,10 +594,10 @@ This prevents spoke networks from acting as transit points.
 ### Enable Network Watcher
 
 ```powershell
-$studentNumber = 1  # Student number (1-40)
+$spokeNumber = 1  # Spoke number (1-40)
 $env = "prod"
-$rgName = "rg-w365-spoke-student$studentNumber-$env"
-$vnetName = "vnet-w365-spoke-student$studentNumber-$env"
+$rgName = "rg-w365-spoke-spoke$spokeNumber-$env"
+$vnetName = "vnet-w365-spoke-spoke$spokeNumber-$env"
 $location = "southcentralus"
 
 # Enable Network Watcher for region
@@ -621,16 +621,16 @@ Set-AzNetworkWatcherConfigFlowLog `
 ### Activity Log Alerts
 
 ```powershell
-$studentNumber = 1  # Student number (1-40)
+$spokeNumber = 1  # Spoke number (1-40)
 $env = "prod"
-$rgName = "rg-w365-spoke-student$studentNumber-$env"
+$rgName = "rg-w365-spoke-spoke$spokeNumber-$env"
 
 # Alert on NSG rule changes
 $actionGroup = Get-AzActionGroup -ResourceGroupName "rg-monitoring" -Name "NetworkAdmins"
 
 New-AzActivityLogAlert `
     -ResourceGroupName "rg-monitoring" `
-    -Name "alert-nsg-changes-student$studentNumber" `
+    -Name "alert-nsg-changes-spoke$spokeNumber" `
     -Condition (New-AzActivityLogAlertCondition -Category "Administrative" -ResourceType "Microsoft.Network/networkSecurityGroups") `
     -Action $actionGroup `
     -Scope "/subscriptions/$subscriptionId/resourceGroups/$rgName"
@@ -641,11 +641,11 @@ New-AzActivityLogAlert `
 ## Quick Reference Commands
 
 ```powershell
-# Set student context
-$studentNumber = 1  # Student number (1-40)
+# Set spoke context
+$spokeNumber = 1  # Spoke number (1-40)
 $env = "prod"
-$rgName = "rg-w365-spoke-student$studentNumber-$env"
-$vnetName = "vnet-w365-spoke-student$studentNumber-$env"
+$rgName = "rg-w365-spoke-spoke$spokeNumber-$env"
+$vnetName = "vnet-w365-spoke-spoke$spokeNumber-$env"
 
 # Check current permissions
 Get-AzRoleAssignment -SignInName "admin@contoso.com" -ResourceGroupName $rgName

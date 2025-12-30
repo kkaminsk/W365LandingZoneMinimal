@@ -13,7 +13,7 @@ This document outlines the step-by-step execution logic of the `deploy.ps1` Powe
 
 | Parameter | Description |
 |-----------|-------------|
-| `-StudentNumber` | Student number (1-40) for unique IP addressing. If omitted, prompts interactively. |
+| `-SpokeNumber` | Spoke number (1-40) for unique IP addressing. If omitted, prompts interactively. |
 | `-WhatIf` | Preview changes without deploying. |
 | `-Validate` | Validate template syntax only. |
 | `-Location` | Azure region (Default: `southcentralus`). |
@@ -26,14 +26,14 @@ This document outlines the step-by-step execution logic of the `deploy.ps1` Powe
 # Interactive deployment
 .\deploy.ps1
 
-# Specific student with preview
-.\deploy.ps1 -StudentNumber 5 -WhatIf
+# Specific spoke with preview
+.\deploy.ps1 -SpokeNumber 5 -WhatIf
 
 # Force fresh login
-.\deploy.ps1 -Force -StudentNumber 3
+.\deploy.ps1 -Force -SpokeNumber 3
 
 # Non-interactive deployment
-.\deploy.ps1 -TenantId "GUID" -SubscriptionId "GUID" -StudentNumber 10
+.\deploy.ps1 -TenantId "GUID" -SubscriptionId "GUID" -SpokeNumber 10
 ```
 
 ## High-Level Flow
@@ -43,7 +43,7 @@ The script follows a sequential 6-step process to ensure prerequisite checks, au
 ```mermaid
 graph TD
     A[Start] --> B{Parameters Provided?}
-    B -- No --> C[Prompt for Student Number]
+    B -- No --> C[Prompt for Spoke Number]
     B -- Yes --> D[Use Provided Parameters]
     C --> D
     D --> E["[1/6] Check Prerequisites"]
@@ -67,10 +67,10 @@ graph TD
 
 ## Detailed Steps
 
-### 1. Parameter Initialization & Student Number Prompt
-*   **Input**: The script accepts parameters: `-StudentNumber`, `-Location`, `-TenantId`, `-SubscriptionId`, `-Validate`, `-WhatIf`, and `-Force`.
-*   **Interactive Prompt**: If `StudentNumber` is not provided via command line, the script interactively prompts the user to enter a number between 1-40 with input validation.
-*   **Calculation**: Based on the student number, it calculates the unique IP address space (e.g., Student 5 -> `192.168.5.0/24`).
+### 1. Parameter Initialization & Spoke Number Prompt
+*   **Input**: The script accepts parameters: `-SpokeNumber`, `-Location`, `-TenantId`, `-SubscriptionId`, `-Validate`, `-WhatIf`, and `-Force`.
+*   **Interactive Prompt**: If `SpokeNumber` is not provided via command line, the script interactively prompts the user to enter a number between 1-40 with input validation.
+*   **Calculation**: Based on the spoke number, it calculates the unique IP address space (e.g., Spoke 5 -> `192.168.5.0/24`).
 
 ### 2. [1/6] Prerequisite Checks (`Test-AzModuleInstalled`)
 *   Verifies that the **Azure PowerShell module (Az)** is installed.
@@ -100,7 +100,7 @@ graph TD
 
 ### 6. [5/6] Windows 365 Service Principal & Validation (`Get-Windows365ServicePrincipal`, `Test-Deployment`)
 *   **Service Principal Lookup**: Retrieves the Object ID for the Windows 365 service principal using the well-known Application ID (`0af06dc6-e4b5-4f28-818e-e78e62d137a5`). This is required for RBAC assignments.
-*   **Parameter Assembly**: Merges the file-based parameters with the script-calculated parameters (Student Number, Service Principal ID).
+*   **Parameter Assembly**: Merges the file-based parameters with the script-calculated parameters (Spoke Number, Service Principal ID).
 *   **Azure Validation**: Runs `Test-AzSubscriptionDeployment`. This sends the template to Azure Resource Manager to check for syntax errors, quota issues, or policy violations without creating resources.
 
 ### 7. [6/6] Deployment Execution (`Start-Deployment`)

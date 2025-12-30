@@ -28,17 +28,17 @@ W365/
 ## 🎯 Infrastructure Deployed
 
 ### ✅ Resource Group
-- **Name**: `rg-w365-spoke-student{N}-prod` (where {N} = student number 1-40)
-- **Purpose**: Contains all Windows 365 spoke network resources for a specific student
+- **Name**: `rg-w365-spoke-spoke{N}-prod` (where {N} = spoke number 1-40)
+- **Purpose**: Contains all Windows 365 spoke network resources for a specific spoke
 
 ### ✅ Virtual Network
-- **Name**: `vnet-w365-spoke-student{N}-prod`
-- **Address Space**: `192.168.{N}.0/24` (Class C - 256 IPs per student)
+- **Name**: `vnet-w365-spoke-spoke{N}-prod`
+- **Address Space**: `192.168.{N}.0/24` (Class C - 256 IPs per spoke)
 - **Region**: southcentralus (configurable)
 
 ### ✅ Subnets (3)
 
-| Subnet | CIDR (Example: Student 1) | Usable IPs | Purpose |
+| Subnet | CIDR (Example: Spoke 1) | Usable IPs | Purpose |
 |--------|------|------------|---------|
 | **snet-cloudpc** | 192.168.1.0/26 | 62 | Windows 365 Cloud PCs |
 | **snet-mgmt** | 192.168.1.64/26 | 62 | Management resources |
@@ -98,14 +98,14 @@ Scope: /subscriptions/{subscription-id}
 # Navigate to W365 folder
 cd W365
 
-# Step 1: Validate for student 1
-.\deploy.ps1 -Validate -StudentNumber 1
+# Step 1: Validate for spoke 1
+.\deploy.ps1 -Validate -SpokeNumber 1
 
-# Step 2: Deploy for student 1
-.\deploy.ps1 -StudentNumber 1
+# Step 2: Deploy for spoke 1
+.\deploy.ps1 -SpokeNumber 1
 
-# Deploy for student 5
-.\deploy.ps1 -StudentNumber 5
+# Deploy for spoke 5
+.\deploy.ps1 -SpokeNumber 5
 ```
 
 ### With Hub Peering
@@ -196,14 +196,14 @@ cd W365
 
 ## ⚙️ Configuration Options
 
-### Set Student Number (Required)
+### Set Spoke Number (Required)
 
 ```json
 {
-  "studentNumber": { "value": 5 }
+  "spokeNumber": { "value": 5 }
 }
 ```
-> **Note**: IP addresses are calculated automatically: 192.168.{studentNumber}.0/24
+> **Note**: IP addresses are calculated automatically: 192.168.{spokeNumber}.0/24
 
 ### Enable Azure Virtual Desktop Subnet
 
@@ -239,10 +239,10 @@ The deployment script includes:
 After successful deployment:
 
 ```
-Outputs (Example for Student 1):
-  resourceGroupName: rg-w365-spoke-student1-prod
-  vnetId: /subscriptions/.../virtualNetworks/vnet-w365-spoke-student1-prod
-  vnetName: vnet-w365-spoke-student1-prod
+Outputs (Example for Spoke 1):
+  resourceGroupName: rg-w365-spoke-spoke1-prod
+  vnetId: /subscriptions/.../virtualNetworks/vnet-w365-spoke-spoke1-prod
+  vnetName: vnet-w365-spoke-spoke1-prod
   cloudPCSubnetId: /subscriptions/.../subnets/snet-cloudpc
   mgmtSubnetId: /subscriptions/.../subnets/snet-mgmt
   avdSubnetId: (empty if disabled)
@@ -281,7 +281,7 @@ Outputs (Example for Student 1):
 |--------|-----|------------|
 | **Permissions** | Owner/Contributor + Network Contributor (for firewall) | Contributor OR Network Contributor |
 | **Complexity** | High (8 modules) | Low (2 modules) |
-| **Address Space** | 10.10.0.0/20 (4,096 IPs) | 192.168.{N}.0/24 (256 IPs per student) |
+| **Address Space** | 10.10.0.0/20 (4,096 IPs) | 192.168.{N}.0/24 (256 IPs per spoke) |
 | **Azure Firewall** | Yes (optional) | No |
 | **Log Analytics** | Yes | No (uses hub's) |
 | **Private DNS** | Yes | No (uses hub's) |

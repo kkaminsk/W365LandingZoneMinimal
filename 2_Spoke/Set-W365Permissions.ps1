@@ -41,6 +41,9 @@ function Write-LogOutput {
 Write-LogOutput "Starting Windows 365 Permission Assignment Script" "Cyan"
 Write-LogOutput "⚠️  WARNING: This script will MODIFY role assignments in your Azure environment" "Yellow"
 Write-LogOutput "Log file: $logPath" "Gray"
+Write-LogOutput "`n📌 Note: This deployment uses a consolidated architecture:" "Cyan"
+Write-LogOutput "   - Resource Group: rg-w365-spokes-prod (single RG for all spokes)" "Gray"
+Write-LogOutput "   - VNet: vnet-w365-spokes-prod (consolidated VNet with 192.168.0.0/16)" "Gray"
 
 # Connect to your Azure Account
 Write-LogOutput "`nConnecting to Azure Account..." "Cyan"
@@ -129,8 +132,14 @@ if ($resourceGroups.Count -eq 0) {
 
 # Prompt user to select a resource group
 Write-LogOutput "`nAvailable Resource Groups:" "Yellow"
+Write-LogOutput "  💡 TIP: For consolidated spoke architecture, select 'rg-w365-spokes-prod'" "Cyan"
 for ($i = 0; $i -lt $resourceGroups.Count; $i++) {
-    Write-LogOutput "  [$($i + 1)] $($resourceGroups[$i].ResourceGroupName) (Location: $($resourceGroups[$i].Location))"
+    $rgName = $resourceGroups[$i].ResourceGroupName
+    $suffix = ""
+    if ($rgName -like "rg-w365-spokes-*") {
+        $suffix = " ← Consolidated spoke RG"
+    }
+    Write-LogOutput "  [$($i + 1)] $rgName (Location: $($resourceGroups[$i].Location))$suffix"
 }
 $rgChoice = Read-Host "`nEnter the number of the resource group you want to use"
 Add-Content -Path $logPath -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss'): User selected resource group option: $rgChoice"
@@ -148,8 +157,14 @@ if ($virtualNetworks.Count -eq 0) {
 
 # Prompt user to select a virtual network
 Write-LogOutput "`nAvailable Virtual Networks:" "Yellow"
+Write-LogOutput "  💡 TIP: For consolidated spoke architecture, select 'vnet-w365-spokes-prod'" "Cyan"
 for ($i = 0; $i -lt $virtualNetworks.Count; $i++) {
-    Write-LogOutput "  [$($i + 1)] $($virtualNetworks[$i].Name) (Location: $($virtualNetworks[$i].Location))"
+    $vnetName = $virtualNetworks[$i].Name
+    $suffix = ""
+    if ($vnetName -like "vnet-w365-spokes-*") {
+        $suffix = " ← Consolidated spoke VNet"
+    }
+    Write-LogOutput "  [$($i + 1)] $vnetName (Location: $($virtualNetworks[$i].Location))$suffix"
 }
 $vnetChoice = Read-Host "`nEnter the number of the virtual network you want to use"
 Add-Content -Path $logPath -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss'): User selected virtual network option: $vnetChoice"

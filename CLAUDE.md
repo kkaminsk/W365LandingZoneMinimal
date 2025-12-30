@@ -1,8 +1,27 @@
+<!-- OPENSPEC:START -->
+# OpenSpec Instructions
+
+These instructions are for AI assistants working in this project.
+
+Always open `@/openspec/AGENTS.md` when the request:
+- Mentions planning or proposals (words like proposal, spec, change, plan)
+- Introduces new capabilities, breaking changes, architecture shifts, or big performance/security work
+- Sounds ambiguous and you need the authoritative spec before coding
+
+Use `@/openspec/AGENTS.md` to learn:
+- How to create and apply change proposals
+- Spec format and conventions
+- Project structure and guidelines
+
+Keep this managed block so 'openspec update' can refresh the instructions.
+
+<!-- OPENSPEC:END -->
+
 # CLAUDE.md - Claude Code Project Guide
 
 ## Project Overview
 
-W365LandingZone is an Infrastructure-as-Code (IaC) repository for deploying Azure hub-and-spoke network architecture for Windows 365 Cloud PC environments. It implements Azure Landing Zone foundations with multi-tenant support for up to 40 students/environments.
+W365LandingZone is an Infrastructure-as-Code (IaC) repository for deploying Azure hub-and-spoke network architecture for Windows 365 Cloud PC environments. It implements Azure Landing Zone foundations with multi-tenant support for up to 40 spokes/environments.
 
 ## Technology Stack
 
@@ -44,10 +63,10 @@ cd 1_Hub
 .\deploy.ps1 -WhatIf          # Preview changes
 .\deploy.ps1                  # Full deployment
 
-# Spoke Deployment (requires StudentNumber 1-40)
+# Spoke Deployment (requires SpokeNumber 1-40)
 cd 2_Spoke
-.\deploy.ps1 -Validate -StudentNumber 1
-.\deploy.ps1 -StudentNumber 1
+.\deploy.ps1 -Validate -SpokeNumber 1
+.\deploy.ps1 -SpokeNumber 1
 
 # Permission Scripts
 .\Setup-MinimumPermissions.ps1 -SubscriptionId "xxx" -AdminEmail "admin@contoso.com"
@@ -71,7 +90,7 @@ cd 2_Spoke
 
 ### IP Addressing
 - Hub: `10.10.0.0/20`
-- Spokes: `192.168.{StudentNumber}.0/24` (auto-calculated)
+- Spokes: `192.168.{SpokeNumber}.0/24` (auto-calculated)
   - Cloud PC: `.0/26` (62 IPs)
   - Management: `.64/26` (62 IPs)
   - AVD: `.128/26` (optional)
@@ -91,7 +110,7 @@ cd 2_Spoke
 | `1_Hub/deploy.ps1` | Hub deployment orchestrator |
 | `2_Spoke/deploy.ps1` | Spoke deployment orchestrator |
 | `1_Hub/infra/envs/prod/main.bicep` | Hub main template |
-| `2_Spoke/infra/envs/prod/main.bicep` | Spoke main template (contains student number logic) |
+| `2_Spoke/infra/envs/prod/main.bicep` | Spoke main template (contains spoke number logic) |
 | `2_Spoke/W365-MinimumRole.json` | Custom RBAC role definition |
 
 ## Testing & Validation

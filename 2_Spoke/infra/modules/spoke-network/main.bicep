@@ -1,20 +1,25 @@
 @description('Azure region for all resources')
 param location string
 
-@description('Name of the spoke virtual network')
-param vnetName string = 'vnet-w365-spoke'
+@description('Name of the consolidated spoke virtual network')
+param vnetName string = 'vnet-w365-spokes'
 
-@description('Address space for the virtual network in CIDR notation (Class C: 192.168.x.0/24)')
-param vnetAddressSpace string = '192.168.100.0/24'
+@description('Address space for the consolidated VNet (192.168.0.0/16 for all spokes)')
+param vnetAddressSpace string = '192.168.0.0/16'
+
+@description('Spoke number (1-40) for unique subnet naming')
+@minValue(1)
+@maxValue(40)
+param spokeNumber int = 1
 
 @description('Address prefix for the Windows 365 Cloud PC subnet')
-param cloudPCSubnetPrefix string = '192.168.100.0/26'
+param cloudPCSubnetPrefix string
 
 @description('Address prefix for the management subnet')
-param mgmtSubnetPrefix string = '192.168.100.64/26'
+param mgmtSubnetPrefix string
 
 @description('Address prefix for the Azure Virtual Desktop subnet (if needed)')
-param avdSubnetPrefix string = '192.168.100.128/26'
+param avdSubnetPrefix string
 
 @description('Enable Azure Virtual Desktop subnet')
 param enableAvdSubnet bool = false
@@ -31,9 +36,14 @@ param useRemoteGateways bool = false
 @description('Resource tags to apply to all resources')
 param tags object = {}
 
+// Subnet names include spoke number for uniqueness within consolidated VNet
+var cloudPCSubnetName = 'snet-spoke${spokeNumber}-cloudpc'
+var mgmtSubnetName = 'snet-spoke${spokeNumber}-mgmt'
+var avdSubnetName = 'snet-spoke${spokeNumber}-avd'
+
 // NSG for Cloud PC subnet - Windows 365 specific rules
 resource nsgCloudPC 'Microsoft.Network/networkSecurityGroups@2024-03-01' = {
-  name: '${vnetName}-cloudpc-nsg'
+  name: 'nsg-spoke${spokeNumber}-cloudpc'
   location: location
   tags: tags
   properties: {
@@ -86,7 +96,7 @@ resource nsgCloudPC 'Microsoft.Network/networkSecurityGroups@2024-03-01' = {
 
 // NSG for Management subnet
 resource nsgMgmt 'Microsoft.Network/networkSecurityGroups@2024-03-01' = {
-  name: '${vnetName}-mgmt-nsg'
+  name: 'nsg-spoke${spokeNumber}-mgmt'
   location: location
   tags: tags
   properties: {
@@ -111,7 +121,7 @@ resource nsgMgmt 'Microsoft.Network/networkSecurityGroups@2024-03-01' = {
 
 // NSG for AVD subnet (if enabled)
 resource nsgAvd 'Microsoft.Network/networkSecurityGroups@2024-03-01' = if (enableAvdSubnet) {
-  name: '${vnetName}-avd-nsg'
+  name: 'nsg-spoke${spokeNumber}-avd'
   location: location
   tags: tags
   properties: {
@@ -134,7 +144,9 @@ resource nsgAvd 'Microsoft.Network/networkSecurityGroups@2024-03-01' = if (enabl
   }
 }
 
-// Spoke Virtual Network
+// Consolidated Spoke Virtual Network
+// This VNet is created once with 192.168.0.0/16 address space
+// Subsequent spoke deployments add their subnets to this VNet
 resource vnet 'Microsoft.Network/virtualNetworks@2024-03-01' = {
   name: vnetName
   location: location
@@ -147,7 +159,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-03-01' = {
     }
     subnets: [
       {
-        name: 'snet-cloudpc'
+        name: cloudPCSubnetName
         properties: {
           addressPrefix: cloudPCSubnetPrefix
           networkSecurityGroup: {
@@ -164,7 +176,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-03-01' = {
         }
       }
       {
-        name: 'snet-mgmt'
+        name: mgmtSubnetName
         properties: {
           addressPrefix: mgmtSubnetPrefix
           networkSecurityGroup: {
@@ -173,7 +185,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-03-01' = {
         }
       }
       {
-        name: 'snet-avd'
+        name: avdSubnetName
         properties: {
           addressPrefix: avdSubnetPrefix
           networkSecurityGroup: enableAvdSubnet ? {
@@ -186,6 +198,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-03-01' = {
 }
 
 // VNet Peering to Hub (if hubVnetId provided)
+// Only one peering needed for the consolidated VNet
 resource peeringToHub 'Microsoft.Network/virtualNetworks/virtualNetworkPeerings@2024-03-01' = if (!empty(hubVnetId)) {
   parent: vnet
   name: 'peer-to-hub'
@@ -207,14 +220,14 @@ output vnetId string = vnet.id
 @description('Virtual Network name')
 output vnetName string = vnet.name
 
-@description('Cloud PC subnet resource ID')
-output cloudPCSubnetId string = vnet.properties.subnets[0].id
+@description('Cloud PC subnet resource ID for this spoke')
+output cloudPCSubnetId string = resourceId('Microsoft.Network/virtualNetworks/subnets', vnetName, cloudPCSubnetName)
 
-@description('Management subnet resource ID')
-output mgmtSubnetId string = vnet.properties.subnets[1].id
+@description('Management subnet resource ID for this spoke')
+output mgmtSubnetId string = resourceId('Microsoft.Network/virtualNetworks/subnets', vnetName, mgmtSubnetName)
 
-@description('AVD subnet resource ID (if enabled)')
-output avdSubnetId string = enableAvdSubnet ? vnet.properties.subnets[2].id : ''
+@description('AVD subnet resource ID for this spoke (if enabled)')
+output avdSubnetId string = enableAvdSubnet ? resourceId('Microsoft.Network/virtualNetworks/subnets', vnetName, avdSubnetName) : ''
 
 @description('Cloud PC NSG resource ID')
 output cloudPCNsgId string = nsgCloudPC.id

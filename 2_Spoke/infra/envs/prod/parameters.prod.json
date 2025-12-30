@@ -8,7 +8,7 @@
     "env": {
       "value": "prod"
     },
-    "studentNumber": {
+    "spokeNumber": {
       "value": 1
     },
     "tags": {

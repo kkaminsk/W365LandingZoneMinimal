@@ -10,8 +10,8 @@ The Spoke virtual network is designed to host Windows 365 Cloud PCs and related 
 
 | Property | Value | Description |
 |----------|-------|-------------|
-| **Name** | `vnet-w365-spoke-student{N}-{env}` | Student number (1-40) provides unique addressing |
-| **Address Space** | `192.168.{N}.0/24` | Class C network, where N = student number |
+| **Name** | `vnet-w365-spoke-spoke{N}-{env}` | Spoke number (1-40) provides unique addressing |
+| **Address Space** | `192.168.{N}.0/24` | Class C network, where N = spoke number |
 | **Location** | `southcentralus` (default) | Azure region for deployment |
 | **Peering** | Optional to Hub VNet | Enables connectivity to shared services |
 
@@ -20,10 +20,10 @@ The Spoke virtual network is designed to host Windows 365 Cloud PCs and related 
 The spoke VNet uses a `/24` address space (256 addresses) divided into three subnets:
 
 ```
-Student 1:  192.168.1.0/24
-Student 2:  192.168.2.0/24
+Spoke 1:  192.168.1.0/24
+Spoke 2:  192.168.2.0/24
 ...
-Student 40: 192.168.40.0/24
+Spoke 40: 192.168.40.0/24
 ```
 
 ## Subnets
@@ -39,7 +39,7 @@ Student 40: 192.168.40.0/24
 | **NSG** | `{vnetName}-cloudpc-nsg` |
 | **Service Endpoints** | Microsoft.Storage, Microsoft.KeyVault |
 
-**IP Range Example (Student 1)**:
+**IP Range Example (Spoke 1)**:
 - Network: `192.168.1.0/26`
 - First usable: `192.168.1.4`
 - Last usable: `192.168.1.62`
@@ -56,7 +56,7 @@ Student 40: 192.168.40.0/24
 | **NSG** | `{vnetName}-mgmt-nsg` |
 | **Service Endpoints** | None |
 
-**IP Range Example (Student 1)**:
+**IP Range Example (Spoke 1)**:
 - Network: `192.168.1.64/26`
 - First usable: `192.168.1.68`
 - Last usable: `192.168.1.126`
@@ -73,7 +73,7 @@ Student 40: 192.168.40.0/24
 | **NSG** | `{vnetName}-avd-nsg` (when enabled) |
 | **Enabled by Default** | No (controlled by `enableAvdSubnet` parameter) |
 
-**IP Range Example (Student 1)**:
+**IP Range Example (Spoke 1)**:
 - Network: `192.168.1.128/26`
 - First usable: `192.168.1.132`
 - Last usable: `192.168.1.190`
@@ -224,7 +224,7 @@ The Cloud PC subnet includes service endpoints for:
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `location` | string | Azure region (default: southcentralus) |
-| `studentNumber` | int | Student number 1-40 for unique addressing |
+| `spokeNumber` | int | Spoke number 1-40 for unique addressing |
 | `windows365ServicePrincipalId` | string | Windows 365 service principal object ID |
 
 ### Optional Parameters

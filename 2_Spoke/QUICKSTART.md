@@ -30,26 +30,26 @@ Get-AzContext
 # Navigate to W365 folder
 cd W365
 
-# Step 1: Validate for student 1 (always run first!)
-.\deploy.ps1 -Validate -StudentNumber 1
+# Step 1: Validate for spoke 1 (always run first!)
+.\deploy.ps1 -Validate -SpokeNumber 1
 
 # Step 2: Preview changes (optional)
-.\deploy.ps1 -WhatIf -StudentNumber 1
+.\deploy.ps1 -WhatIf -SpokeNumber 1
 
-# Step 3: Deploy for student 1
-.\deploy.ps1 -StudentNumber 1
+# Step 3: Deploy for spoke 1
+.\deploy.ps1 -SpokeNumber 1
 
-# For other students, change the StudentNumber (1-40)
-# Student 5 example:
-.\deploy.ps1 -StudentNumber 5
+# For other spokes, change the SpokeNumber (1-40)
+# Spoke 5 example:
+.\deploy.ps1 -SpokeNumber 5
 ```
 
 ## Expected Output
 
 ```
-✓ Deployment successful (Example for Student 1)
-Resource Group: rg-w365-spoke-student1-prod
-VNet: vnet-w365-spoke-student1-prod (192.168.1.0/24)
+✓ Deployment successful (Example for Spoke 1)
+Resource Group: rg-w365-spoke1-prod
+VNet: vnet-w365-spoke1-prod (192.168.1.0/24)
 Cloud PC Subnet: 192.168.1.0/26
 Management Subnet: 192.168.1.64/26
 ```

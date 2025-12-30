@@ -11,7 +11,7 @@ Hub Network (10.10.0.0/20)
     ├── Azure Firewall Subnet (optional)
     └── Gateway Subnet (optional)
     
-W365 Spoke Network (192.168.{N}.0/24) where N=student number
+W365 Spoke Network (192.168.{N}.0/24) where N=spoke number
     ├── Cloud PC Subnet
     ├── Management Subnet
     └── AVD Subnet (optional)
@@ -24,7 +24,7 @@ W365 Spoke Network (192.168.{N}.0/24) where N=student number
 | Feature | Hub Network | W365 Spoke Network |
 |---------|-------------|-------------------|
 | **Purpose** | Central connectivity & security | Windows 365 Cloud PC hosting |
-| **Address Space** | 10.10.0.0/20 (4,096 IPs) | 192.168.{N}.0/24 (256 IPs, N=student 1-40) |
+| **Address Space** | 10.10.0.0/20 (4,096 IPs) | 192.168.{N}.0/24 (256 IPs, N=spoke 1-40) |
 | **Deployment Scope** | Subscription-level | Subscription-level |
 | **Resource Groups** | 2 (network + ops) | 1 (spoke only) |
 | **Azure Firewall** | Yes (optional) | No |
@@ -113,7 +113,7 @@ In the Hub VNet, create peering to spoke:
 New-AzVirtualNetworkPeering `
   -Name "peer-to-w365-spoke" `
   -VirtualNetwork (Get-AzVirtualNetwork -Name "vnet-hub" -ResourceGroupName "rg-hub-net") `
-  -RemoteVirtualNetworkId "/subscriptions/{sub-id}/resourceGroups/rg-w365-spoke-student1-prod/providers/Microsoft.Network/virtualNetworks/vnet-w365-spoke-student1-prod" `
+  -RemoteVirtualNetworkId "/subscriptions/{sub-id}/resourceGroups/rg-w365-spoke-spoke1-prod/providers/Microsoft.Network/virtualNetworks/vnet-w365-spoke-spoke1-prod" `
   -AllowForwardedTraffic `
   -AllowGatewayTransit
 ```
@@ -129,22 +129,22 @@ New-AzVirtualNetworkPeering `
   - Gateway: 10.10.3.0/27 (32 IPs)
   - Reserved: 10.10.4.0 - 10.10.15.255 (future expansion)
 
-### W365 Spoke Network (192.168.{N}.0/24) where N=student number
-- Total: 256 IP addresses per student
-- Subnets (example for Student 1):
+### W365 Spoke Network (192.168.{N}.0/24) where N=spoke number
+- Total: 256 IP addresses per spoke
+- Subnets (example for Spoke 1):
   - Cloud PC: 192.168.1.0/26 (64 IPs, 62 usable)
   - Management: 192.168.1.64/26 (64 IPs, 62 usable)
   - AVD: 192.168.1.128/26 (64 IPs, 62 usable)
   - Reserved: 192.168.1.192/26 (64 IPs for expansion)
 
-### Adding More Student Spokes
+### Adding More Spoke Spokes
 
-Each student gets unique Class C range:
-- Student 1: 192.168.1.0/24 → `rg-w365-spoke-student1-prod`
-- Student 2: 192.168.2.0/24 → `rg-w365-spoke-student2-prod`
-- Student 3: 192.168.3.0/24 → `rg-w365-spoke-student3-prod`
+Each spoke gets unique Class C range:
+- Spoke 1: 192.168.1.0/24 → `rg-w365-spoke-spoke1-prod`
+- Spoke 2: 192.168.2.0/24 → `rg-w365-spoke-spoke2-prod`
+- Spoke 3: 192.168.3.0/24 → `rg-w365-spoke-spoke3-prod`
 - ...
-- Student 40: 192.168.40.0/24 → `rg-w365-spoke-student40-prod`
+- Spoke 40: 192.168.40.0/24 → `rg-w365-spoke-spoke40-prod`
 
 ## 🔒 Security Comparison
 

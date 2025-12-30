@@ -8,20 +8,20 @@ This folder contains Bicep infrastructure-as-code for deploying a Windows 365 sp
 # Navigate to W365 folder
 cd W365
 
-# Deploy for student 1 (uses 192.168.1.0/24)
-.\deploy.ps1 -StudentNumber 1
+# Deploy for spoke 1 (uses 192.168.1.0/24)
+.\deploy.ps1 -SpokeNumber 1
 
-# Deploy for student 5 (uses 192.168.5.0/24)
-.\deploy.ps1 -StudentNumber 5
+# Deploy for spoke 5 (uses 192.168.5.0/24)
+.\deploy.ps1 -SpokeNumber 5
 
 # Validate template before deployment
-.\deploy.ps1 -Validate -StudentNumber 10
+.\deploy.ps1 -Validate -SpokeNumber 10
 
 # Deploy to a specific subscription (e.g. Hub and Spoke in different subscriptions)
-.\deploy.ps1 -SubscriptionId "<spoke-subscription-guid>" -StudentNumber 1
+.\deploy.ps1 -SubscriptionId "<spoke-subscription-guid>" -SpokeNumber 1
 
 # Deploy to a specific tenant and subscription (multi-tenant admins)
-.\deploy.ps1 -TenantId "<tenant-guid>" -SubscriptionId "<subscription-guid>" -StudentNumber 1
+.\deploy.ps1 -TenantId "<tenant-guid>" -SubscriptionId "<subscription-guid>" -SpokeNumber 1
 ```
 
 ## 🌐 Subscription Flexibility
@@ -32,18 +32,19 @@ This solution supports deploying the **Spoke** network to:
 
 The deployment script `deploy.ps1` automatically handles the context switching if you provide the `-SubscriptionId` parameter. The optional VNet peering to the Hub works across subscriptions as long as your account has permissions on both VNets.
 
-> **⚠️ Important**: Always specify `-StudentNumber` (1-40) to ensure unique IP addressing for each student. See [IP-ADDRESSING.md](./IP-ADDRESSING.md) for details.
+> **⚠️ Important**: Always specify `-SpokeNumber` (1-40) to ensure unique IP addressing for each spoke. See [IP-ADDRESSING.md](./IP-ADDRESSING.md) for details.
 
 ## 📦 What's Included
 
-- **Resource Group**: `rg-w365-spoke-student{N}-prod` (where {N} = student number)
-- **Virtual Network**: `192.168.{N}.0/24` (where {N} = student number 1-40)
-  - Cloud PC Subnet: `192.168.{N}.0/26` (62 usable IPs)
-  - Management Subnet: `192.168.{N}.64/26` (62 usable IPs)
-  - AVD Subnet: `192.168.{N}.128/26` (optional, disabled by default)
-- **Network Security Groups**: Pre-configured for Windows 365
-- **Service Endpoints**: Storage and KeyVault
-- **Hub Peering**: Optional connection to hub network
+- **Resource Group**: `rg-w365-spokes-prod` (single consolidated RG for all spokes)
+- **Consolidated Virtual Network**: `vnet-w365-spokes-prod` with `192.168.0.0/16` address space
+- **Per-Spoke Subnets** (where {N} = spoke number 1-40):
+  - `snet-spoke{N}-cloudpc`: `192.168.{N}.0/26` (62 usable IPs)
+  - `snet-spoke{N}-mgmt`: `192.168.{N}.64/26` (62 usable IPs)
+  - `snet-spoke{N}-avd`: `192.168.{N}.128/26` (optional, disabled by default)
+- **Network Security Groups**: Per-spoke NSGs pre-configured for Windows 365
+- **Service Endpoints**: Storage and KeyVault on Cloud PC subnets
+- **Hub Peering**: Single peering from consolidated VNet to hub
 
 ## 📋 Prerequisites
 
@@ -79,17 +80,17 @@ bicep --version
 
 ## 📖 Documentation
 
-- **[IP-ADDRESSING.md](./IP-ADDRESSING.md)** - **Multi-student IP addressing scheme (IMPORTANT)**
+- **[IP-ADDRESSING.md](./IP-ADDRESSING.md)** - **Multi-spoke IP addressing scheme (IMPORTANT)**
 - **[Deployps1-Readme.md](./Deployps1-Readme.md)** - Complete deployment guide with troubleshooting
 - **[deploy.ps1](./deploy.ps1)** - PowerShell deployment script
 
-## 🎯 IP Address Allocation (Per Student)
+## 🎯 IP Address Allocation (Per Spoke)
 
-Each student receives a unique `/24` network based on their student number:
+All spokes share a single consolidated VNet (`192.168.0.0/16`). Each spoke receives dedicated subnets:
 
-**Pattern**: `192.168.X.0/24` where `X` = Student Number (1-40)
+**Pattern**: `snet-spoke{X}-{purpose}` with IP range `192.168.X.0/24` where `X` = Spoke Number (1-40)
 
-**Example for Student 5**:
+**Example for Spoke 5**:
 
 | Subnet | Range | CIDR | Usable IPs | Purpose |
 |--------|-------|------|------------|---------|
@@ -98,7 +99,7 @@ Each student receives a unique `/24` network based on their student number:
 | AVD | 192.168.5.128 - 192.168.5.191 | /26 | 62 | Azure Virtual Desktop (optional) |
 | Reserved | 192.168.5.192 - 192.168.5.255 | - | 64 | Future expansion |
 
-> **📘 See [IP-ADDRESSING.md](./IP-ADDRESSING.md)** for complete details on multi-student deployments, capacity planning, and troubleshooting.
+> **📘 See [IP-ADDRESSING.md](./IP-ADDRESSING.md)** for complete details on multi-spoke deployments, capacity planning, and troubleshooting.
 
 ## ⚙️ Configuration
 
@@ -107,24 +108,33 @@ Edit `infra/envs/prod/parameters.prod.json` to customize:
 ```json
 {
   "location": { "value": "southcentralus" },
-  "studentNumber": { "value": 1 },
+  "spokeNumber": { "value": 1 },
   "enableAvdSubnet": { "value": false },
   "hubVnetId": { "value": "" }
 }
 ```
 
-> **Note**: IP addresses are calculated automatically based on `studentNumber`. You no longer need to specify `vnetAddressSpace`, `cloudPCSubnetPrefix`, etc.
+> **Note**: IP addresses are calculated automatically based on `spokeNumber`. You no longer need to specify `vnetAddressSpace`, `cloudPCSubnetPrefix`, etc.
 
-## 🔗 Hub Peering
+## 🔗 Hub Peering (Auto-Enabled by Default)
 
-To connect to hub network, set the hub VNet ID:
+The deployment script automatically discovers hub VNets and enables peering:
 
-```json
-{
-  "hubVnetId": { 
-    "value": "/subscriptions/{sub-id}/resourceGroups/rg-hub-net/providers/Microsoft.Network/virtualNetworks/vnet-hub"
-  }
-}
+**Default Behavior:**
+- Searches for VNets matching pattern `vnet-hub*` in the subscription
+- Automatically configures peering if a hub VNet is found
+- Displays peering status during deployment
+
+**Control Peering:**
+```powershell
+# Auto-peering (default) - discovers and peers with hub
+.\deploy.ps1 -SpokeNumber 1
+
+# Disable auto-peering explicitly
+.\deploy.ps1 -SpokeNumber 1 -DisablePeering
+
+# Manually specify hub VNet ID (overrides auto-discovery)
+.\deploy.ps1 -SpokeNumber 1 -HubVnetId "/subscriptions/{sub-id}/resourceGroups/rg-hub-net/providers/Microsoft.Network/virtualNetworks/vnet-hub"
 ```
 
 ⚠️ **Note**: You must also create the reverse peering from hub to spoke.

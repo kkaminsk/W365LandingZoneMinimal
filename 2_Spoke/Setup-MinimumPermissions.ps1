@@ -13,7 +13,7 @@
     Target Azure subscription ID
 
 .PARAMETER ResourceGroupName
-    Resource group name for W365 spoke network (default: rg-w365-spoke-prod)
+    Resource group name for W365 spoke network (default: rg-w365-spokes-prod for consolidated architecture)
 
 .PARAMETER AdminEmail
     Email address of the administrator who will deploy the spoke network
@@ -28,7 +28,7 @@
     Comma-separated list of allowed Azure regions (default: canadacentral,eastus,westus3)
 
 .PARAMETER AllowedIPRanges
-    Comma-separated list of allowed VNet CIDR blocks (default: 192.168.100.0/24,192.168.101.0/24,192.168.102.0/24)
+    Comma-separated list of allowed VNet CIDR blocks (default: 192.168.0.0/16 for consolidated VNet)
 
 .PARAMETER CreateResourceGroup
     If specified, creates the resource group. Otherwise assumes it exists.
@@ -46,7 +46,7 @@ param(
     [string]$SubscriptionId,
     
     [Parameter(Mandatory=$false)]
-    [string]$ResourceGroupName = "rg-w365-spoke-prod",
+    [string]$ResourceGroupName = "rg-w365-spokes-prod",
     
     [Parameter(Mandatory=$true)]
     [string]$AdminEmail,
@@ -61,7 +61,7 @@ param(
     [string[]]$AllowedRegions = @('southcentralus', 'eastus', 'westus3'),
     
     [Parameter(Mandatory=$false)]
-    [string[]]$AllowedIPRanges = @('192.168.100.0/24', '192.168.101.0/24', '192.168.102.0/24'),
+    [string[]]$AllowedIPRanges = @('192.168.0.0/16'),
     
     [Parameter(Mandatory=$false)]
     [switch]$CreateResourceGroup
@@ -71,7 +71,12 @@ $ErrorActionPreference = "Stop"
 
 Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "  W365 Spoke Network Security Setup" -ForegroundColor Cyan
+Write-Host "  (Consolidated Architecture)" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
+Write-Host "📌 Note: This deployment uses a consolidated architecture:" -ForegroundColor Yellow
+Write-Host "   - Resource Group: $ResourceGroupName (single RG for all spokes)" -ForegroundColor Gray
+Write-Host "   - VNet: vnet-w365-spokes-prod (consolidated VNet with 192.168.0.0/16)" -ForegroundColor Gray
+Write-Host ""
 
 # Set context
 Write-Host "Setting Azure context to subscription: $SubscriptionId" -ForegroundColor Cyan

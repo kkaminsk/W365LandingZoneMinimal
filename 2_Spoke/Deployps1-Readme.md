@@ -7,14 +7,14 @@ This PowerShell script deploys a Windows 365 spoke network infrastructure to Azu
 ### Always Deployed (Core Infrastructure)
 
 ✅ **Resource Group**
-- `rg-w365-spoke-student{N}-prod` - Contains all Windows 365 spoke network resources (where {N} = student number)
+- `rg-w365-spoke{N}-prod` - Contains all Windows 365 spoke network resources (where {N} = spoke number)
 
 ✅ **Virtual Network**
-- **Address Space**: `192.168.{N}.0/24` (where {N} = student number 1-40)
-- **Name**: `vnet-w365-spoke-student{N}-prod`
+- **Address Space**: `192.168.{N}.0/24` (where {N} = spoke number 1-40)
+- **Name**: `vnet-w365-spoke{N}-prod`
 - **Location**: southcentralus (configurable)
 
-✅ **Subnets** (Example for Student 1)
+✅ **Subnets** (Example for Spoke 1)
 - **Cloud PC Subnet** (`192.168.1.0/26`) - 62 usable IPs for Windows 365 Cloud PCs
 - **Management Subnet** (`192.168.1.64/26`) - 62 usable IPs for management resources
 - **AVD Subnet** (`192.168.1.128/26`) - 62 usable IPs (optional, disabled by default)
@@ -124,38 +124,38 @@ Scope: /subscriptions/{subscription-id}
 
 ### Basic Deployment
 
-Deploy the Windows 365 spoke network for student 1:
+Deploy the Windows 365 spoke network for spoke 1:
 ```powershell
 cd W365
-.\deploy.ps1 -StudentNumber 1
+.\deploy.ps1 -SpokeNumber 1
 ```
 
-### Deploy for Different Students
+### Deploy for Different Spokes
 
-Deploy for student 5 (gets 192.168.5.0/24):
+Deploy for spoke 5 (gets 192.168.5.0/24):
 ```powershell
-.\deploy.ps1 -StudentNumber 5
+.\deploy.ps1 -SpokeNumber 5
 ```
 
 ### Validation Only
 
 Validate the template without deploying:
 ```powershell
-.\deploy.ps1 -Validate -StudentNumber 1
+.\deploy.ps1 -Validate -SpokeNumber 1
 ```
 
 ### What-If Analysis
 
 Preview changes before deployment:
 ```powershell
-.\deploy.ps1 -WhatIf -StudentNumber 1
+.\deploy.ps1 -WhatIf -SpokeNumber 1
 ```
 
 ### Custom Location
 
 Deploy to a different region:
 ```powershell
-.\deploy.ps1 -Location "eastus" -StudentNumber 1
+.\deploy.ps1 -Location "eastus" -SpokeNumber 1
 ```
 
 ### Cross-Subscription Deployment (Hub & Spoke Separation)
@@ -163,7 +163,7 @@ Deploy to a different region:
 If your Hub network is in one subscription and you want to deploy the Spoke to a **different** subscription:
 ```powershell
 # Deploy Spoke to a specific subscription ID
-.\deploy.ps1 -SubscriptionId "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" -StudentNumber 1
+.\deploy.ps1 -SubscriptionId "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" -SpokeNumber 1
 ```
 
 The script will handle the context switching. The optional peering to the Hub (via `hubVnetId` parameter) supports cross-subscription links natively.
@@ -197,12 +197,12 @@ Edit `infra/envs/prod/parameters.prod.json`:
   "parameters": {
     "location": { "value": "southcentralus" },
     "env": { "value": "prod" },
-    "studentNumber": { "value": 1 }
+    "spokeNumber": { "value": 1 }
   }
 }
 ```
 
-> **Note**: IP addresses are calculated automatically from `studentNumber`. Student 1 gets 192.168.1.0/24, Student 5 gets 192.168.5.0/24, etc.
+> **Note**: IP addresses are calculated automatically from `spokeNumber`. Spoke 1 gets 192.168.1.0/24, Student 5 gets 192.168.5.0/24, etc.
 
 ### Enable Hub Peering
 
@@ -334,7 +334,7 @@ New-AzRoleAssignment `
 
 **Solution**: Ensure your subnets don't overlap and fit within the VNet address space.
 
-Example for Student 1:
+Example for Spoke 1:
 ```
 VNet:     192.168.1.0/24    (256 IPs)
 ├─ CloudPC:  .0/26          (64 IPs: .0-.63)
@@ -342,7 +342,7 @@ VNet:     192.168.1.0/24    (256 IPs)
 └─ AVD:      .128/26        (64 IPs: .128-.191)
 ```
 
-The script automatically calculates these based on the StudentNumber parameter.
+The script automatically calculates these based on the SpokeNumber parameter.
 
 ### Permission Issues
 
@@ -352,7 +352,7 @@ The script automatically calculates these based on the StudentNumber parameter.
 Get-AzRoleAssignment -SignInName your.email@domain.com -Scope "/subscriptions/YOUR-SUB-ID"
 
 # Check specific resource group permissions (after RG created)
-Get-AzRoleAssignment -ResourceGroupName "rg-w365-spoke-student1-prod"
+Get-AzRoleAssignment -ResourceGroupName "rg-w365-spoke1-prod"
 ```
 
 #### Request Permissions
