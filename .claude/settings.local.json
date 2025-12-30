@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(tree /f /l C:tempW365LandingZone)",
+      "Bash(tree:*)",
+      "Bash(mkdir:*)",
+      "Bash(openspec validate:*)",
+      "Bash(openspec list:*)",
+      "Bash(openspec archive consolidate-spoke-vnets:*)",
+      "Bash(openspec archive enable-peering-default:*)",
+      "Bash(openspec archive rename-student-to-spoke:*)",
+      "Bash(openspec archive update-permissions-scripts:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nArchive completed OpenSpec changes and create initial specs\n\nArchive 4 completed changes:\n- consolidate-spoke-vnets: Consolidated VNet architecture\n- enable-peering-default: Auto hub discovery and peering\n- rename-student-to-spoke: SpokeNumber parameter terminology\n- update-permissions-scripts: Permission scripts for new architecture\n\nCreate initial specs:\n- spoke-network \\(7 requirements\\)\n- spoke-deployment \\(1 requirement\\)\n- spoke-permissions \\(3 requirements\\)\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
