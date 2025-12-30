@@ -36,17 +36,3 @@ All spoke resources SHALL be deployed to a single shared resource group named `r
 
 - **WHEN** deploying any spoke number
 - **THEN** resources are created in `rg-w365-spokes-prod` resource group
-
-## REMOVED Requirements
-
-### Requirement: Per-Spoke VNet
-
-**Reason**: Replaced by consolidated VNet approach for simplified management.
-
-**Migration**: Migrate existing Cloud PCs to subnets in consolidated VNet, then delete old per-spoke VNets and resource groups.
-
-### Requirement: Per-Spoke Resource Group
-
-**Reason**: Single resource group simplifies RBAC and management.
-
-**Migration**: After migrating workloads, delete old resource groups `rg-w365-spoke-student{N}-{env}`.

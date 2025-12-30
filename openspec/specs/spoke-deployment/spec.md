@@ -1,5 +1,8 @@
-## ADDED Requirements
+# spoke-deployment Specification
 
+## Purpose
+TBD - created by archiving change rename-student-to-spoke. Update Purpose after archive.
+## Requirements
 ### Requirement: Spoke Number Parameter
 
 The spoke deployment script SHALL accept a `SpokeNumber` parameter (range 1-40) to identify the spoke instance for unique IP addressing.
@@ -14,10 +17,3 @@ The spoke deployment script SHALL accept a `SpokeNumber` parameter (range 1-40) 
 - **WHEN** user runs `.\deploy.ps1` without the SpokeNumber parameter
 - **THEN** the script prompts "Enter Spoke Number (1-40)"
 
-## REMOVED Requirements
-
-### Requirement: Student Number Parameter
-
-**Reason**: Replaced by SpokeNumber parameter for broader applicability beyond educational contexts.
-
-**Migration**: Replace all `-StudentNumber` parameter usage with `-SpokeNumber`. Update any automation scripts calling deploy.ps1.

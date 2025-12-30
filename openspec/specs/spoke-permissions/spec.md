@@ -1,5 +1,8 @@
-## MODIFIED Requirements
+# spoke-permissions Specification
 
+## Purpose
+TBD - created by archiving change update-permissions-scripts. Update Purpose after archive.
+## Requirements
 ### Requirement: Windows 365 Permission Assignment
 
 The `Set-W365Permissions.ps1` script SHALL assign Windows 365 service principal permissions to the consolidated spoke VNet and resource group using spoke terminology.
@@ -41,3 +44,4 @@ The `Setup-MinimumPermissions.ps1` script SHALL configure permissions for the co
 
 - **WHEN** running script without AllowedIPRanges parameter
 - **THEN** the default includes `192.168.0.0/16` for consolidated VNet space
+

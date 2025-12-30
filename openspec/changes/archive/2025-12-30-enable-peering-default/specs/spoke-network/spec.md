@@ -37,8 +37,6 @@ The deployment output SHALL clearly indicate the peering status and hub VNet det
 - **WHEN** spoke deployment completes with peering enabled
 - **THEN** the output displays "Peered to: vnet-hub-prod (10.10.0.0/20)"
 
-## MODIFIED Requirements
-
 ### Requirement: Hub VNet Peering
 
 VNet peering to hub SHALL be enabled by default when hub VNet is auto-discovered, replacing the previous opt-in behavior requiring manual hubVnetId parameter.
