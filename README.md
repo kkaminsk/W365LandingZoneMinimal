@@ -24,22 +24,25 @@ These solutions use **Azure Bicep** templates and **PowerShell** deployment scri
 │  Shared Services: Firewall, Private DNS, Log Analytics          │
 └────────────┬────────────────────────────────────────────────────┘
              │
-             │ VNet Peering
+             │ VNet Peering (Auto-Enabled)
              │
-     ┌───────┴────────┬──────────────────┐
-     │                │                  │
-                                       
-┌─────────┐      ┌─────────┐       ┌─────────┐
-│ Spoke 1 │      │ Spoke 2 │  ...  │ Spoke N │
-│ Student │      │ Student │       │ Student │
-│    1    │      │    2    │       │   40    │
-└─────────┘      └─────────┘       └─────────┘
-192.168.1.0/24   192.168.2.0/24    192.168.40.0/24
+┌────────────┴────────────────────────────────────────────────────┐
+│           Consolidated Spoke VNet (192.168.0.0/16)              │
+│                     vnet-w365-spokes-prod                       │
+│                                                                 │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
+│  │    Spoke 1      │  │    Spoke 2      │  │    Spoke N      │ │
+│  │ 192.168.1.0/24  │  │ 192.168.2.0/24  │  │ 192.168.N.0/24  │ │
+│  │                 │  │                 │  │                 │ │
+│  │ - cloudpc /26   │  │ - cloudpc /26   │  │ - cloudpc /26   │ │
+│  │ - mgmt    /26   │  │ - mgmt    /26   │  │ - mgmt    /26   │ │
+│  │ - avd     /26   │  │ - avd     /26   │  │ - avd     /26   │ │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
+│                                                                 │
+│  Single Resource Group: rg-w365-spokes-prod                     │
+└─────────────────────────────────────────────────────────────────┘
 
-Each Spoke VNet contains:
-├── Cloud PC Subnet (Windows 365)
-├── Management Subnet
-└── AVD Subnet (Optional)
+Supports up to 40 spokes within consolidated VNet
 ```
 
 ## Repository Structure
@@ -80,7 +83,7 @@ W365LandingZone/
 │   ├── Check-W365Permissions.ps1   # Permission verification script
 │   ├── W365-MinimumRole.json       # Custom RBAC role definition
 │   ├── ARCHITECTURE-DIAGRAM.md     # Network topology diagrams
-│   ├── IP-ADDRESSING.md            # Multi-student IP allocation
+│   ├── IP-ADDRESSING.md            # Multi-spoke IP allocation
 │   ├── HUB-VS-SPOKE.md             # Comparison and integration guide
 │   ├── PERMISSIONS-AND-RESTRICTIONS.md # Security configuration
 │   ├── DEPLOYMENT-SUMMARY.md       # Deployment overview
@@ -121,10 +124,10 @@ cd 1_Hub
 **Step 2: Deploy Windows 365 Spoke Network**
 ```powershell
 cd ..\2_Spoke
-.\deploy.ps1 -StudentNumber 1
+.\deploy.ps1 -SpokeNumber 1
 ```
 
-**Step 3: Configure VNet Peering** (See detailed instructions below)
+The spoke deployment automatically discovers the hub VNet and configures peering.
 
 ### Option 2: Deploy Spoke Only (Standalone)
 
@@ -132,7 +135,7 @@ If you already have existing network infrastructure or want a standalone Windows
 
 ```powershell
 cd 2_Spoke
-.\deploy.ps1 -StudentNumber 1
+.\deploy.ps1 -SpokeNumber 1 -DisablePeering
 ```
 
 ## Solution 1: Hub Network (`1_Hub/`)
@@ -213,29 +216,31 @@ Edit `1_Hub/infra/envs/prod/parameters.prod.json`:
 ## Solution 2: Windows 365 Spoke Network (`2_Spoke/`)
 
 ### Purpose
-Provides dedicated network infrastructure for Windows 365 Cloud PC deployments with multi-student support (up to 40 students/environments).
+Provides dedicated network infrastructure for Windows 365 Cloud PC deployments with multi-spoke support (up to 40 spokes) using a consolidated VNet architecture.
 
 ### What Gets Deployed
 
 #### Resource Group
-- `rg-w365-spoke-student{N}-prod` (where N = student number 1-40)
+- `rg-w365-spokes-prod` - Single consolidated resource group for all spokes
 
-#### Networking (192.168.{N}.0/24)
-- **Virtual Network** with automatic IP addressing based on student number:
-  - **Cloud PC Subnet**: 192.168.{N}.0/26 (62 usable IPs for Windows 365)
-  - **Management Subnet**: 192.168.{N}.64/26 (62 usable IPs)
-  - **AVD Subnet**: 192.168.{N}.128/26 (optional, disabled by default)
+#### Networking (192.168.0.0/16 Consolidated VNet)
+- **Consolidated Virtual Network** (`vnet-w365-spokes-prod`) shared by all spokes
+- **Per-spoke subnets** with automatic IP addressing based on spoke number:
+  - **Cloud PC Subnet**: `snet-spoke{N}-cloudpc` - 192.168.{N}.0/26 (62 usable IPs)
+  - **Management Subnet**: `snet-spoke{N}-mgmt` - 192.168.{N}.64/26 (62 usable IPs)
+  - **AVD Subnet**: `snet-spoke{N}-avd` - 192.168.{N}.128/26 (optional)
   - **Reserved**: 192.168.{N}.192/26 (future expansion)
 
 #### Security
-- **Network Security Groups** (3) pre-configured for Windows 365:
+- **Network Security Groups** (per spoke) pre-configured for Windows 365:
   - Cloud PC NSG (RDP allowed from VNet, HTTPS outbound)
   - Management NSG
   - AVD NSG (if enabled)
 - **Service Endpoints**: Storage and KeyVault
 
-#### Optional Features
-- **VNet Peering** to hub network (when `hubVnetId` is configured)
+#### Hub Integration (Auto-Enabled)
+- **Automatic Hub Discovery**: Finds VNets matching `vnet-hub*` pattern
+- **VNet Peering**: Automatically configured when hub is discovered
 
 ### Deployment
 
@@ -243,25 +248,31 @@ Provides dedicated network infrastructure for Windows 365 Cloud PC deployments w
 # Navigate to spoke folder
 cd 2_Spoke
 
-# Deploy for Student 1 (uses 192.168.1.0/24)
-.\deploy.ps1 -StudentNumber 1
+# Deploy for Spoke 1 (uses 192.168.1.0/24 subnet range)
+.\deploy.ps1 -SpokeNumber 1
 
-# Deploy for Student 5 (uses 192.168.5.0/24)
-.\deploy.ps1 -StudentNumber 5
+# Deploy for Spoke 5 (uses 192.168.5.0/24 subnet range)
+.\deploy.ps1 -SpokeNumber 5
 
 # Validate before deploying
-.\deploy.ps1 -Validate -StudentNumber 10
+.\deploy.ps1 -Validate -SpokeNumber 10
+
+# Deploy without hub peering
+.\deploy.ps1 -SpokeNumber 1 -DisablePeering
+
+# Specify hub VNet manually (overrides auto-discovery)
+.\deploy.ps1 -SpokeNumber 1 -HubVnetId "/subscriptions/{sub-id}/resourceGroups/rg-hub-net/providers/Microsoft.Network/virtualNetworks/vnet-hub"
 ```
 
 ### IP Address Allocation
 
-Each student receives a unique `/24` network:
+All spokes share a single consolidated VNet (`192.168.0.0/16`). Each spoke receives dedicated subnets within its `/24` range:
 
-| Student | VNet CIDR | Cloud PC Subnet | Management Subnet | AVD Subnet |
-|---------|-----------|-----------------|-------------------|------------|
-| Student 1 | 192.168.1.0/24 | 192.168.1.0/26 | 192.168.1.64/26 | 192.168.1.128/26 |
-| Student 5 | 192.168.5.0/24 | 192.168.5.0/26 | 192.168.5.64/26 | 192.168.5.128/26 |
-| Student N | 192.168.{N}.0/24 | 192.168.{N}.0/26 | 192.168.{N}.64/26 | 192.168.{N}.128/26 |
+| Spoke | Subnet Range | Cloud PC Subnet | Management Subnet | AVD Subnet |
+|-------|--------------|-----------------|-------------------|------------|
+| Spoke 1 | 192.168.1.0/24 | 192.168.1.0/26 | 192.168.1.64/26 | 192.168.1.128/26 |
+| Spoke 5 | 192.168.5.0/24 | 192.168.5.0/26 | 192.168.5.64/26 | 192.168.5.128/26 |
+| Spoke N | 192.168.{N}.0/24 | 192.168.{N}.0/26 | 192.168.{N}.64/26 | 192.168.{N}.128/26 |
 
 ### Configuration
 
@@ -269,11 +280,19 @@ Edit `2_Spoke/infra/envs/prod/parameters.prod.json`:
 ```json
 {
   "location": { "value": "southcentralus" },
-  "studentNumber": { "value": 1 },
+  "spokeNumber": { "value": 1 },
   "enableAvdSubnet": { "value": false },
   "hubVnetId": { "value": "" }
 }
 ```
+
+### Hub Peering Options
+
+| Option | Command | Behavior |
+|--------|---------|----------|
+| Auto-discovery (default) | `.\deploy.ps1 -SpokeNumber 1` | Finds `vnet-hub*` and peers automatically |
+| Disable peering | `.\deploy.ps1 -SpokeNumber 1 -DisablePeering` | No hub peering |
+| Manual hub ID | `.\deploy.ps1 -SpokeNumber 1 -HubVnetId "..."` | Uses specified hub VNet |
 
 ### Security & Permissions
 
@@ -284,7 +303,7 @@ For enterprise deployments with minimum privilege requirements, use the provided
 - **[README.md](2_Spoke/README.md)** - Comprehensive spoke documentation
 - **[Deployps1-Readme.md](2_Spoke/Deployps1-Readme.md)** - Deployment script documentation
 - **[ExecutionFlow.md](2_Spoke/ExecutionFlow.md)** - Script execution flow details
-- **[IP-ADDRESSING.md](2_Spoke/IP-ADDRESSING.md)** - Multi-student IP allocation details
+- **[IP-ADDRESSING.md](2_Spoke/IP-ADDRESSING.md)** - Multi-spoke IP allocation details
 - **[ARCHITECTURE-DIAGRAM.md](2_Spoke/ARCHITECTURE-DIAGRAM.md)** - Network topology diagrams
 - **[HUB-VS-SPOKE.md](2_Spoke/HUB-VS-SPOKE.md)** - Comparison and integration guide
 - **[PERMISSIONS-AND-RESTRICTIONS.md](2_Spoke/PERMISSIONS-AND-RESTRICTIONS.md)** - Security configuration
@@ -296,48 +315,46 @@ For enterprise deployments with minimum privilege requirements, use the provided
 
 ## Connecting Hub and Spoke
 
-### Step 1: Deploy Hub Network
+### Automatic Peering (Recommended)
+
+When you deploy spokes after the hub, peering is configured automatically:
+
 ```powershell
+# Step 1: Deploy Hub
 cd 1_Hub
 ./deploy.ps1
-```
-Note the Hub VNet Resource ID from the deployment output.
 
-### Step 2: Deploy Spoke with Hub Integration
-
-Update `2_Spoke/infra/envs/prod/parameters.prod.json`:
-```json
-{
-  "hubVnetId": { 
-    "value": "/subscriptions/{sub-id}/resourceGroups/rg-hub-net/providers/Microsoft.Network/virtualNetworks/vnet-hub"
-  }
-}
+# Step 2: Deploy Spoke (auto-discovers hub and peers)
+cd ../2_Spoke
+./deploy.ps1 -SpokeNumber 1
 ```
 
-Deploy the spoke:
-```powershell
-cd 2_Spoke
-./deploy.ps1 -StudentNumber 1
-```
+The deployment script:
+1. Searches for VNets matching `vnet-hub*` pattern
+2. Automatically configures bidirectional VNet peering
+3. Displays peering status in deployment output
 
-### Step 3: Create Reverse Peering (Hub to Spoke)
+### Manual Hub Specification
 
-In the hub network, create peering back to the spoke:
+If auto-discovery doesn't find your hub or you have multiple hubs:
 
 ```powershell
-New-AzVirtualNetworkPeering `
-  -Name "peer-to-w365-spoke-student1" `
-  -VirtualNetwork (Get-AzVirtualNetwork -Name "vnet-hub" -ResourceGroupName "rg-hub-net") `
-  -RemoteVirtualNetworkId "/subscriptions/{sub-id}/resourceGroups/rg-w365-spoke-student1-prod/providers/Microsoft.Network/virtualNetworks/vnet-w365-spoke-student1-prod" `
-  -AllowForwardedTraffic `
-  -AllowGatewayTransit
+.\deploy.ps1 -SpokeNumber 1 -HubVnetId "/subscriptions/{sub-id}/resourceGroups/rg-hub-net/providers/Microsoft.Network/virtualNetworks/vnet-hub"
+```
+
+### Standalone Deployment (No Peering)
+
+For isolated spoke networks without hub connectivity:
+
+```powershell
+.\deploy.ps1 -SpokeNumber 1 -DisablePeering
 ```
 
 ## Prerequisites
 
 ### Required Software
 - **Azure PowerShell** (Az module)
-- **Bicep CLI** - `winget install -e --id Microsoft.Bicep` 
+- **Bicep CLI** - `winget install -e --id Microsoft.Bicep`
 - **PowerShell 5.1+** or **PowerShell 7+**
 
 ### Azure Requirements
@@ -363,13 +380,13 @@ Get-AzContext
 ## Use Cases
 
 ### Scenario 1: Enterprise Hub-Spoke with Windows 365
-Deploy centralized hub infrastructure with multiple Windows 365 spoke networks for different teams/students.
+Deploy centralized hub infrastructure with multiple Windows 365 spoke subnets for different teams or environments.
 
 ### Scenario 2: Standalone Windows 365 Network
-Quick Windows 365 deployment without hub infrastructure.
+Quick Windows 365 deployment without hub infrastructure using `-DisablePeering`.
 
-### Scenario 3: Training/Lab Environment
-Support multiple students (up to 40) with isolated networks and automated IP addressing.
+### Scenario 3: Multi-Tenant/Lab Environment
+Support multiple isolated environments (up to 40 spokes) with automated IP addressing within a single consolidated VNet.
 
 ## Security Features
 
@@ -390,9 +407,9 @@ Support multiple students (up to 40) with isolated networks and automated IP add
 
 ## Best Practices
 
-1. **Deploy Hub First** - Always deploy the hub network before spoke networks
+1. **Deploy Hub First** - Always deploy the hub network before spoke networks for automatic peering
 2. **Use Validation** - Run `.\deploy.ps1 -Validate` before actual deployment
-3. **Document IP Ranges** - Maintain a spreadsheet of allocated IP ranges
+3. **Document Spoke Assignments** - Maintain a record of which spoke numbers are assigned to which teams/environments
 4. **Version Control** - Store all configuration files in Git
 5. **Test in Dev** - Deploy to dev/test environments first
 
@@ -401,7 +418,7 @@ Support multiple students (up to 40) with isolated networks and automated IP add
 1. Review architecture and IP addressing scheme
 2. Deploy hub network (if using hub-spoke topology)
 3. Deploy spoke network(s) for Windows 365
-4. Configure VNet peering (if using hub-spoke)
+4. Verify automatic hub peering in deployment output
 5. Set up Windows 365 provisioning policies
 6. Deploy Cloud PCs to spoke subnet
 
@@ -418,4 +435,4 @@ See [LICENSE](LICENSE) file for details.
 
 ---
 
-**Ready to deploy?** Start with the [Hub QUICKSTART](1_Hub/QUICKSTART.md) or [Spoke QUICKSTART](2_Spoke/QUICKSTART.md)! 
+**Ready to deploy?** Start with the [Hub QUICKSTART](1_Hub/QUICKSTART.md) or [Spoke QUICKSTART](2_Spoke/QUICKSTART.md)!
