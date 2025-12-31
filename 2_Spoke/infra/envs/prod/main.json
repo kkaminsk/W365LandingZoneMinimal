@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.37.4.10188",
-      "templateHash": "12688819117076708111"
+      "templateHash": "18115526885531815652"
     }
   },
   "parameters": {
@@ -23,13 +23,13 @@
         "description": "Environment name (prod, dev, test)"
       }
     },
-    "studentNumber": {
+    "spokeNumber": {
       "type": "int",
       "defaultValue": 1,
       "minValue": 1,
       "maxValue": 40,
       "metadata": {
-        "description": "Student number (1-40) for unique IP addressing"
+        "description": "Spoke number (1-40) for unique subnet addressing within consolidated VNet"
       }
     },
     "tags": {
@@ -80,19 +80,19 @@
     }
   },
   "variables": {
-    "thirdOctet": "[parameters('studentNumber')]",
-    "vnetAddressSpace": "[format('192.168.{0}.0/24', variables('thirdOctet'))]",
+    "consolidatedVnetAddressSpace": "192.168.0.0/16",
+    "thirdOctet": "[parameters('spokeNumber')]",
     "cloudPCSubnetPrefix": "[format('192.168.{0}.0/26', variables('thirdOctet'))]",
     "mgmtSubnetPrefix": "[format('192.168.{0}.64/26', variables('thirdOctet'))]",
     "avdSubnetPrefix": "[format('192.168.{0}.128/26', variables('thirdOctet'))]",
-    "rgName": "[format('rg-w365-spoke-student{0}-{1}', parameters('studentNumber'), parameters('env'))]",
-    "vnetName": "[format('vnet-w365-spoke-student{0}-{1}', parameters('studentNumber'), parameters('env'))]"
+    "rgName": "[format('rg-w365-spokes-{0}', parameters('env'))]",
+    "vnetName": "[format('vnet-w365-spokes-{0}', parameters('env'))]"
   },
   "resources": [
     {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
-      "name": "[format('rg-w365-spoke-student{0}', parameters('studentNumber'))]",
+      "name": "[format('rg-w365-spokes-{0}', parameters('env'))]",
       "location": "[deployment().location]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -173,7 +173,7 @@
     {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
-      "name": "[format('spoke-network-w365-student{0}', parameters('studentNumber'))]",
+      "name": "[format('spoke-network-spoke{0}', parameters('spokeNumber'))]",
       "resourceGroup": "[variables('rgName')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -188,7 +188,10 @@
             "value": "[variables('vnetName')]"
           },
           "vnetAddressSpace": {
-            "value": "[variables('vnetAddressSpace')]"
+            "value": "[variables('consolidatedVnetAddressSpace')]"
+          },
+          "spokeNumber": {
+            "value": "[parameters('spokeNumber')]"
           },
           "cloudPCSubnetPrefix": {
             "value": "[variables('cloudPCSubnetPrefix')]"
@@ -222,7 +225,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.37.4.10188",
-              "templateHash": "14655255454161941090"
+              "templateHash": "7729295378054917377"
             }
           },
           "parameters": {
@@ -234,35 +237,41 @@
             },
             "vnetName": {
               "type": "string",
-              "defaultValue": "vnet-w365-spoke",
+              "defaultValue": "vnet-w365-spokes",
               "metadata": {
-                "description": "Name of the spoke virtual network"
+                "description": "Name of the consolidated spoke virtual network"
               }
             },
             "vnetAddressSpace": {
               "type": "string",
-              "defaultValue": "192.168.100.0/24",
+              "defaultValue": "192.168.0.0/16",
               "metadata": {
-                "description": "Address space for the virtual network in CIDR notation (Class C: 192.168.x.0/24)"
+                "description": "Address space for the consolidated VNet (192.168.0.0/16 for all spokes)"
+              }
+            },
+            "spokeNumber": {
+              "type": "int",
+              "defaultValue": 1,
+              "minValue": 1,
+              "maxValue": 40,
+              "metadata": {
+                "description": "Spoke number (1-40) for unique subnet naming"
               }
             },
             "cloudPCSubnetPrefix": {
               "type": "string",
-              "defaultValue": "192.168.100.0/26",
               "metadata": {
                 "description": "Address prefix for the Windows 365 Cloud PC subnet"
               }
             },
             "mgmtSubnetPrefix": {
               "type": "string",
-              "defaultValue": "192.168.100.64/26",
               "metadata": {
                 "description": "Address prefix for the management subnet"
               }
             },
             "avdSubnetPrefix": {
               "type": "string",
-              "defaultValue": "192.168.100.128/26",
               "metadata": {
                 "description": "Address prefix for the Azure Virtual Desktop subnet (if needed)"
               }
@@ -303,11 +312,16 @@
               }
             }
           },
+          "variables": {
+            "cloudPCSubnetName": "[format('snet-spoke{0}-cloudpc', parameters('spokeNumber'))]",
+            "mgmtSubnetName": "[format('snet-spoke{0}-mgmt', parameters('spokeNumber'))]",
+            "avdSubnetName": "[format('snet-spoke{0}-avd', parameters('spokeNumber'))]"
+          },
           "resources": [
             {
               "type": "Microsoft.Network/networkSecurityGroups",
               "apiVersion": "2024-03-01",
-              "name": "[format('{0}-cloudpc-nsg', parameters('vnetName'))]",
+              "name": "[format('nsg-spoke{0}-cloudpc', parameters('spokeNumber'))]",
               "location": "[parameters('location')]",
               "tags": "[parameters('tags')]",
               "properties": {
@@ -360,7 +374,7 @@
             {
               "type": "Microsoft.Network/networkSecurityGroups",
               "apiVersion": "2024-03-01",
-              "name": "[format('{0}-mgmt-nsg', parameters('vnetName'))]",
+              "name": "[format('nsg-spoke{0}-mgmt', parameters('spokeNumber'))]",
               "location": "[parameters('location')]",
               "tags": "[parameters('tags')]",
               "properties": {
@@ -386,7 +400,7 @@
               "condition": "[parameters('enableAvdSubnet')]",
               "type": "Microsoft.Network/networkSecurityGroups",
               "apiVersion": "2024-03-01",
-              "name": "[format('{0}-avd-nsg', parameters('vnetName'))]",
+              "name": "[format('nsg-spoke{0}-avd', parameters('spokeNumber'))]",
               "location": "[parameters('location')]",
               "tags": "[parameters('tags')]",
               "properties": {
@@ -422,11 +436,11 @@
                 },
                 "subnets": [
                   {
-                    "name": "snet-cloudpc",
+                    "name": "[variables('cloudPCSubnetName')]",
                     "properties": {
                       "addressPrefix": "[parameters('cloudPCSubnetPrefix')]",
                       "networkSecurityGroup": {
-                        "id": "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-cloudpc-nsg', parameters('vnetName')))]"
+                        "id": "[resourceId('Microsoft.Network/networkSecurityGroups', format('nsg-spoke{0}-cloudpc', parameters('spokeNumber')))]"
                       },
                       "serviceEndpoints": [
                         {
@@ -439,27 +453,27 @@
                     }
                   },
                   {
-                    "name": "snet-mgmt",
+                    "name": "[variables('mgmtSubnetName')]",
                     "properties": {
                       "addressPrefix": "[parameters('mgmtSubnetPrefix')]",
                       "networkSecurityGroup": {
-                        "id": "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-mgmt-nsg', parameters('vnetName')))]"
+                        "id": "[resourceId('Microsoft.Network/networkSecurityGroups', format('nsg-spoke{0}-mgmt', parameters('spokeNumber')))]"
                       }
                     }
                   },
                   {
-                    "name": "snet-avd",
+                    "name": "[variables('avdSubnetName')]",
                     "properties": {
                       "addressPrefix": "[parameters('avdSubnetPrefix')]",
-                      "networkSecurityGroup": "[if(parameters('enableAvdSubnet'), createObject('id', resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-avd-nsg', parameters('vnetName')))), null())]"
+                      "networkSecurityGroup": "[if(parameters('enableAvdSubnet'), createObject('id', resourceId('Microsoft.Network/networkSecurityGroups', format('nsg-spoke{0}-avd', parameters('spokeNumber')))), null())]"
                     }
                   }
                 ]
               },
               "dependsOn": [
-                "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-avd-nsg', parameters('vnetName')))]",
-                "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-cloudpc-nsg', parameters('vnetName')))]",
-                "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-mgmt-nsg', parameters('vnetName')))]"
+                "[resourceId('Microsoft.Network/networkSecurityGroups', format('nsg-spoke{0}-avd', parameters('spokeNumber')))]",
+                "[resourceId('Microsoft.Network/networkSecurityGroups', format('nsg-spoke{0}-cloudpc', parameters('spokeNumber')))]",
+                "[resourceId('Microsoft.Network/networkSecurityGroups', format('nsg-spoke{0}-mgmt', parameters('spokeNumber')))]"
               ]
             },
             {
@@ -499,37 +513,37 @@
             "cloudPCSubnetId": {
               "type": "string",
               "metadata": {
-                "description": "Cloud PC subnet resource ID"
+                "description": "Cloud PC subnet resource ID for this spoke"
               },
-              "value": "[reference(resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName')), '2024-03-01').subnets[0].id]"
+              "value": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), variables('cloudPCSubnetName'))]"
             },
             "mgmtSubnetId": {
               "type": "string",
               "metadata": {
-                "description": "Management subnet resource ID"
+                "description": "Management subnet resource ID for this spoke"
               },
-              "value": "[reference(resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName')), '2024-03-01').subnets[1].id]"
+              "value": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), variables('mgmtSubnetName'))]"
             },
             "avdSubnetId": {
               "type": "string",
               "metadata": {
-                "description": "AVD subnet resource ID (if enabled)"
+                "description": "AVD subnet resource ID for this spoke (if enabled)"
               },
-              "value": "[if(parameters('enableAvdSubnet'), reference(resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName')), '2024-03-01').subnets[2].id, '')]"
+              "value": "[if(parameters('enableAvdSubnet'), resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), variables('avdSubnetName')), '')]"
             },
             "cloudPCNsgId": {
               "type": "string",
               "metadata": {
                 "description": "Cloud PC NSG resource ID"
               },
-              "value": "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-cloudpc-nsg', parameters('vnetName')))]"
+              "value": "[resourceId('Microsoft.Network/networkSecurityGroups', format('nsg-spoke{0}-cloudpc', parameters('spokeNumber')))]"
             },
             "mgmtNsgId": {
               "type": "string",
               "metadata": {
                 "description": "Management NSG resource ID"
               },
-              "value": "[resourceId('Microsoft.Network/networkSecurityGroups', format('{0}-mgmt-nsg', parameters('vnetName')))]"
+              "value": "[resourceId('Microsoft.Network/networkSecurityGroups', format('nsg-spoke{0}-mgmt', parameters('spokeNumber')))]"
             },
             "peeringStatus": {
               "type": "string",
@@ -542,13 +556,13 @@
         }
       },
       "dependsOn": [
-        "[subscriptionResourceId('Microsoft.Resources/deployments', format('rg-w365-spoke-student{0}', parameters('studentNumber')))]"
+        "[subscriptionResourceId('Microsoft.Resources/deployments', format('rg-w365-spokes-{0}', parameters('env')))]"
       ]
     },
     {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2022-09-01",
-      "name": "[format('w365-permissions-student{0}', parameters('studentNumber'))]",
+      "name": "[format('w365-permissions-spoke{0}', parameters('spokeNumber'))]",
       "resourceGroup": "[variables('rgName')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -649,7 +663,7 @@
         }
       },
       "dependsOn": [
-        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', format('spoke-network-w365-student{0}', parameters('studentNumber')))]"
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', format('spoke-network-spoke{0}', parameters('spokeNumber')))]"
       ]
     }
   ],
@@ -659,56 +673,56 @@
       "metadata": {
         "description": "Resource Group name"
       },
-      "value": "[reference(subscriptionResourceId('Microsoft.Resources/deployments', format('rg-w365-spoke-student{0}', parameters('studentNumber'))), '2022-09-01').outputs.resourceGroupName.value]"
+      "value": "[reference(subscriptionResourceId('Microsoft.Resources/deployments', format('rg-w365-spokes-{0}', parameters('env'))), '2022-09-01').outputs.resourceGroupName.value]"
     },
     "vnetId": {
       "type": "string",
       "metadata": {
         "description": "Virtual Network ID"
       },
-      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', format('spoke-network-w365-student{0}', parameters('studentNumber'))), '2022-09-01').outputs.vnetId.value]"
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', format('spoke-network-spoke{0}', parameters('spokeNumber'))), '2022-09-01').outputs.vnetId.value]"
     },
     "vnetName": {
       "type": "string",
       "metadata": {
         "description": "Virtual Network name"
       },
-      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', format('spoke-network-w365-student{0}', parameters('studentNumber'))), '2022-09-01').outputs.vnetName.value]"
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', format('spoke-network-spoke{0}', parameters('spokeNumber'))), '2022-09-01').outputs.vnetName.value]"
     },
     "cloudPCSubnetId": {
       "type": "string",
       "metadata": {
-        "description": "Cloud PC subnet ID"
+        "description": "Cloud PC subnet ID for spoke"
       },
-      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', format('spoke-network-w365-student{0}', parameters('studentNumber'))), '2022-09-01').outputs.cloudPCSubnetId.value]"
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', format('spoke-network-spoke{0}', parameters('spokeNumber'))), '2022-09-01').outputs.cloudPCSubnetId.value]"
     },
     "mgmtSubnetId": {
       "type": "string",
       "metadata": {
-        "description": "Management subnet ID"
+        "description": "Management subnet ID for spoke"
       },
-      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', format('spoke-network-w365-student{0}', parameters('studentNumber'))), '2022-09-01').outputs.mgmtSubnetId.value]"
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', format('spoke-network-spoke{0}', parameters('spokeNumber'))), '2022-09-01').outputs.mgmtSubnetId.value]"
     },
     "avdSubnetId": {
       "type": "string",
       "metadata": {
-        "description": "AVD subnet ID"
+        "description": "AVD subnet ID for spoke"
       },
-      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', format('spoke-network-w365-student{0}', parameters('studentNumber'))), '2022-09-01').outputs.avdSubnetId.value]"
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', format('spoke-network-spoke{0}', parameters('spokeNumber'))), '2022-09-01').outputs.avdSubnetId.value]"
     },
     "peeringStatus": {
       "type": "string",
       "metadata": {
         "description": "Peering status to hub"
       },
-      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', format('spoke-network-w365-student{0}', parameters('studentNumber'))), '2022-09-01').outputs.peeringStatus.value]"
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', format('spoke-network-spoke{0}', parameters('spokeNumber'))), '2022-09-01').outputs.peeringStatus.value]"
     },
     "w365PermissionsStatus": {
       "type": "string",
       "metadata": {
         "description": "Windows 365 permissions status"
       },
-      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', format('w365-permissions-student{0}', parameters('studentNumber'))), '2022-09-01').outputs.status.value]"
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', format('w365-permissions-spoke{0}', parameters('spokeNumber'))), '2022-09-01').outputs.status.value]"
     }
   }
 }
